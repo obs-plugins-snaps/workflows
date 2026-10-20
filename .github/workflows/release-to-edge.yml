@@ -1,0 +1,70 @@
+name: Release to edge
+
+on:
+  workflow_call:
+    inputs:
+      plugin_name:
+        description: >-
+          Name of the upstream plugin project. The snap name is
+          "<plugin_name>-obs-studio".
+        required: true
+        type: string
+
+concurrency:
+  # Serialize releases per branch so that two pushes to main never race to
+  # upload to the same channel. Never cancel an in-progress release, or we
+  # could end up with an uploaded-but-unreleased snap.
+  group: release-to-edge-${{ inputs.plugin_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: 🚢 Release to latest/edge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: pack
+        uses: canonical/craft-actions/snapcraft/pack@main
+
+      - name: 🚢 Upload and release to latest/edge
+        id: release
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_EDGE }}
+          snap_files: ${{ steps.pack.outputs.snaps }}
+        run: |
+          set -euo pipefail
+
+          # The pack action installs snapcraft as a side effect; make sure it
+          # is available anyway in case that ever changes.
+          command -v snapcraft >/dev/null || sudo snap install snapcraft --classic
+
+          echo "| Architecture | Version | Revision |" >> summary.md
+          echo "| ------------ | ------- | -------- |" >> summary.md
+
+          revisions=""
+          for snap_file in $snap_files; do
+            out="$(snapcraft upload "$snap_file" --release=latest/edge)"
+            revision="$(echo "$out" | grep -oP 'Revision \K[0-9]+')"
+
+            # Snap file names look like "<snap>_<version>_<arch>.snap".
+            version="$(echo "$snap_file" | cut -d_ -f2)"
+            architecture="$(echo "$snap_file" | cut -d_ -f3 | sed 's/\.snap$//')"
+
+            revisions="${revisions:+$revisions,}$revision"
+            echo "| $architecture | $version | $revision |" >> summary.md
+          done
+
+          echo "revisions=$revisions" >> "$GITHUB_OUTPUT"
+
+          cat >> summary.md <<EOF
+
+          To promote this release to beta, candidate, or stable, comment
+          \`/promote <revision> <risk-level>\` on any issue in this repository
+          (for example, \`/promote latest candidate\`).
+          EOF
+
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"

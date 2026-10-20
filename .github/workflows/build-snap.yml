@@ -22,5 +22,5 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: ${{ inputs.plugin_name }}-${{ steps.pack.outputs.snap }}
-          path: ${{ steps.pack.outputs.snap }}
+          name: ${{ inputs.plugin_name }}-snap
+          path: ${{ steps.pack.outputs.snaps }}
