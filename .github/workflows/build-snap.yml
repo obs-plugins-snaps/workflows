@@ -1,0 +1,26 @@
+name: Build snap
+
+on:
+  workflow_call:
+    inputs:
+      plugin_name:
+        description: >-
+          Name of the upstream plugin project, used to identify the
+          packaged plugin in logs and artifact names
+        required: true
+        type: string
+
+jobs:
+  pack:
+    name: Pack snap
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: canonical/craft-actions/snapcraft/pack@main
+        id: pack
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.plugin_name }}-${{ steps.pack.outputs.snap }}
+          path: ${{ steps.pack.outputs.snap }}
