@@ -68,9 +68,12 @@ jobs:
 
           cat >> summary.md <<EOF
 
-          To promote this release to beta, candidate, or stable, comment
-          \`/promote <revision> <risk-level>\` on any issue in this repository
-          (for example, \`/promote latest candidate\`).
+          To promote this release to beta, candidate, or stable, run the
+          "${{ github.workflow }}" workflow from the Actions tab of this
+          repository: set \`channel\` to the target risk level, and leave
+          \`revision\` as \`latest\` to promote the newest revision in
+          \`latest/edge\` (this release), or set it to a specific revision
+          number.
           EOF
 
           cat summary.md >> "$GITHUB_STEP_SUMMARY"

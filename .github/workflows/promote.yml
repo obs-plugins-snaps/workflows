@@ -9,99 +9,67 @@ on:
           "<plugin_name>-obs-studio".
         required: true
         type: string
+      revision:
+        description: >-
+          Revision to promote: a store revision number, a comma-separated
+          list of them, or "latest" for the newest revision in latest/edge.
+        required: false
+        type: string
+        default: latest
+      channel:
+        description: >-
+          Target risk level: beta, candidate or stable.
+        required: true
+        type: string
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   promote:
     name: ⬆️ Promote revisions to a risk level
     runs-on: ubuntu-latest
-    # Only react to "/promote ..." comments on issues, not on pull requests
-    # and not on unrelated comments. This job only runs when the caller
-    # triggers this workflow on `issue_comment` events.
-    if: >-
-      !github.event.issue.pull_request
-      && contains(github.event.comment.body, '/promote')
+    # This workflow is meant to be triggered manually: the caller declares a
+    # workflow_dispatch trigger with matching inputs and forwards them here.
+    # GitHub requires write access to dispatch a workflow, so no extra
+    # permission check is needed.
+    if: github.event_name == 'workflow_dispatch'
     steps:
-      - name: 🔒 Check commenter permissions
-        env:
-          GH_TOKEN: ${{ github.token }}
-          commenter: ${{ github.event.comment.user.login }}
-        run: |
-          set -euo pipefail
-
-          permission="$(gh api \
-            "repos/$GITHUB_REPOSITORY/collaborators/$commenter/permission" \
-            --jq .permission)"
-
-          case "$permission" in
-            admin|write) ;;
-            *)
-              echo "Commenter @$commenter only has '$permission' access."
-              echo "Only collaborators with write access can promote."
-              exit 1
-              ;;
-          esac
-
-      - name: 👀 Acknowledge command
-        env:
-          GH_TOKEN: ${{ github.token }}
-          comment_id: ${{ github.event.comment.id }}
-        run: |
-          gh api "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id/reactions" \
-            -f content=eyes >/dev/null
-
       - name: 🛠 Set up snapcraft
         uses: canonical/craft-actions/snapcraft/setup@main
 
       - name: ⬆️ Promote
         env:
-          GH_TOKEN: ${{ github.token }}
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
           snap_name: ${{ inputs.plugin_name }}-obs-studio
-          comment_body: ${{ github.event.comment.body }}
-          issue_number: ${{ github.event.issue.number }}
+          requested_channel: ${{ inputs.channel }}
+          requested_revision: ${{ inputs.revision }}
         run: |
           set -euo pipefail
 
-          command="$(grep -oP '^\s*/promote\s+\S.*$' <<< "$comment_body" | head -n1)"
-          if [[ -z "$command" ]]; then
-            echo "No /promote command found in the comment."
-            exit 1
-          fi
-
-          read -ra arguments <<< "${command#*/promote}"
-          requested_revision="${arguments[0]:-}"
-          channel="${arguments[1]:-}"
-
-          report_error() {
-            gh issue comment "$issue_number" --repo "$GITHUB_REPOSITORY" \
-              --body "⚠️ $1"
-            exit 1
-          }
-
-          case "$channel" in
-            latest/beta|beta)     channel="latest/beta" ;;
+          case "$requested_channel" in
+            latest/beta|beta)           channel="latest/beta" ;;
             latest/candidate|candidate) channel="latest/candidate" ;;
-            latest/stable|stable) channel="latest/stable" ;;
-            "") report_error "No risk level given. Usage: \`/promote <revision> <beta|candidate|stable>\`." ;;
-            *) report_error "\`$channel\` is not a supported risk level. Usage: \`/promote <revision> <beta|candidate|stable>\`." ;;
+            latest/stable|stable)       channel="latest/stable" ;;
+            *)
+              echo "::error::'$requested_channel' is not a supported risk level. Use beta, candidate or stable."
+              exit 1
+              ;;
           esac
 
-          # Accept "latest" as a shortcut for the newest revision in edge.
           # Accept "latest" as a shortcut for the newest revision in edge.
           if [[ "$requested_revision" == "latest" ]]; then
             requested_revision="$(snapcraft list-revisions "$snap_name" \
               | awk '/latest\/edge/ {gsub(/[^0-9]/, "", $1); if ($1 != "") revision = $1} END {print revision}')"
             if [[ -z "$requested_revision" ]]; then
-              report_error "Could not find any revision in the \`latest/edge\` channel."
+              echo "::error::Could not find any revision in the latest/edge channel."
+              exit 1
             fi
           fi
 
           if [[ ! "$requested_revision" =~ ^[0-9]+([,][0-9]+)*$ ]]; then
-            report_error "Revision must be a number or a comma-separated list of numbers (or \`latest\`), not \`$requested_revision\`."
+            echo "::error::Revision must be a number or a comma-separated list of numbers (or latest), not '$requested_revision'."
+            exit 1
           fi
 
           released=""
@@ -114,12 +82,11 @@ jobs:
             fi
           done
 
-          message=""
+          summary=""
           if [[ -n "$released" ]]; then
-            message+="The following revisions were released to the \`$channel\` channel: \`$released\`. "
+            summary+="The following revisions were released to the \`$channel\` channel: \`$released\`. "
           fi
           if [[ -n "$failed" ]]; then
-            message+="The following revisions could not be released: \`$failed\`. Check the workflow logs for details. "
+            summary+="The following revisions could not be released: \`$failed\`. Check the workflow logs for details. "
           fi
-
-          gh issue comment "$issue_number" --repo "$GITHUB_REPOSITORY" --body "$message"
+          echo "$summary" >> "$GITHUB_STEP_SUMMARY"
