@@ -1,0 +1,72 @@
+name: Tag commit
+
+on:
+  workflow_call:
+    inputs:
+      initial_version:
+        description: >-
+          Version to tag the first commit with when the repository has no
+          tags yet
+        required: false
+        type: string
+        default: v0.0.1
+
+concurrency:
+  # Serialize tag bumps per branch so that two pushes to main never race to
+  # push the next version.
+  group: tag-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    name: 🏷️ Tag with the next patch version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: 🏷️ Create and push the next patch tag
+        env:
+          initial_version: ${{ inputs.initial_version }}
+        run: |
+          set -euo pipefail
+
+          git fetch --tags --force
+
+          # A manually pushed tag wins over the automatic bump: if the head
+          # commit is already tagged (e.g. a manual minor or major bump),
+          # there is nothing to do.
+          if git tag --list 'v*' --points-at HEAD | grep -q .; then
+            echo "HEAD is already tagged; skipping the automatic bump."
+            exit 0
+          fi
+
+          latest="$(git tag --list 'v*' --sort=-v:refname | head -n1)"
+          semver_re='^v[0-9]+\.[0-9]+\.[0-9]+$'
+          if [[ -z "$latest" ]]; then
+            echo "No existing tags; starting at $initial_version."
+            next="$initial_version"
+          elif [[ ! "$latest" =~ $semver_re ]]; then
+            echo "::error::Latest tag '$latest' is not a vMAJOR.MINOR.PATCH version; cannot bump automatically."
+            exit 1
+          else
+            version="${latest#v}"
+            major="${version%%.*}"
+            rest="${version#*.}"
+            minor="${rest%%.*}"
+            patch="${rest#*.}"
+            next="v${major}.${minor}.$((patch + 1))"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$next" >/dev/null; then
+            echo "::error::Tag $next already exists; refusing to overwrite."
+            exit 1
+          fi
+
+          echo "Tagging HEAD as $next."
+          git tag "$next"
+          git push origin "$next"

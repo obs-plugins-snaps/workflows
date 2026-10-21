@@ -46,6 +46,25 @@ Secrets:
 | ----------------------- | ----------------------------------------------------------------------------------------------- |
 | `SNAPCRAFT_STORE_EDGE`  | Snap Store credentials with permission to upload and release to `latest/edge` for the snap.      |
 
+### `tag.yml`
+
+Tags the calling repository's head commit with the next patch version
+(`vMAJOR.MINOR.PATCH`), continuing from the latest existing `v*` tag.
+Intended to be called on every push to `main`, so that every commit is
+immediately upgradable — this is how the copier template stays current for
+generated projects running `copier update`.
+
+If the head commit is already tagged, the workflow does nothing: push a
+manual tag to make a minor or major bump, and the next automatic bump
+continues from it. The bump fails loudly if the latest tag is not a
+`vMAJOR.MINOR.PATCH` version.
+
+Inputs:
+
+| Input             | Required | Description                                                            |
+| ----------------- | -------- | ---------------------------------------------------------------------- |
+| `initial_version` | no       | Version for the first tag when no `v*` tags exist (default: `v0.0.1`)  |
+
 ### `promote.yml`
 
 Promotes already uploaded revisions of the snap to a risk level chosen by
