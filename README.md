@@ -50,32 +50,19 @@ Secrets:
 
 Promotes already uploaded revisions of the snap to a risk level chosen by
 the maintainer (`beta`, `candidate`, or `stable`). Intended to be called
-on `issue_comment` events. A maintainer comments:
-
-```
-/promote <revision> <risk-level>
-```
-
-where `<revision>` is a store revision number (or a comma-separated list
-of them), or the shortcut `latest` (the newest revision currently in
-`latest/edge`), and `<risk-level>` is one of `beta`, `candidate`, or
-`stable`. For example:
-
-```
-/promote 42 candidate
-/promote 42,43 latest/stable
-/promote latest stable
-```
-
-The command is acknowledged with a 👀 reaction, and the outcome is
-reported as a comment on the same issue. Only collaborators with write
-access to the repository can promote.
+on `workflow_dispatch` events: the caller declares a `workflow_dispatch`
+trigger with matching inputs and forwards them to this reusable workflow.
+GitHub requires write access to dispatch a workflow, so no extra
+permission check is needed. The outcome is printed in the workflow
+summary.
 
 Inputs:
 
-| Input         | Required | Description                                                                |
-| ------------- | -------- | -------------------------------------------------------------------------- |
-| `plugin_name` | yes      | Upstream plugin project name; the snap name is `<plugin_name>-obs-studio` |
+| Input         | Required | Description                                                                        |
+| ------------- | -------- | ---------------------------------------------------------------------------------- |
+| `plugin_name` | yes      | Upstream plugin project name; the snap name is `<plugin_name>-obs-studio`          |
+| `revision`    | no       | Revision to promote: a store revision number, a comma-separated list of them, or `latest` (default; the newest revision currently in `latest/edge`) |
+| `channel`     | yes      | Target risk level: `beta`, `candidate`, or `stable`                                 |
 
 Secrets:
 
@@ -94,8 +81,15 @@ on:
   push:
     branches: [main]
   pull_request:
-  issue_comment:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: "Revision (number or 'latest')"
+        required: false
+        default: latest
+      channel:
+        description: "beta, candidate or stable"
+        required: true
 
 jobs:
   # Pull requests: build only.
@@ -113,12 +107,14 @@ jobs:
       plugin_name: "source-record"
     secrets: inherit
 
-  # Maintainers promote edge revisions by commenting on issues.
+  # Maintainers promote by running this workflow from the Actions tab.
   promote:
-    if: github.event_name == 'issue_comment'
+    if: github.event_name == 'workflow_dispatch'
     uses: obs-plugins-snaps/workflows/.github/workflows/promote.yml@main
     with:
       plugin_name: "source-record"
+      revision: ${{ inputs.revision }}
+      channel: ${{ inputs.channel }}
     secrets: inherit
 ```
 
