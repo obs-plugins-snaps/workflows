@@ -21,32 +21,38 @@ permissions:
   contents: read
 
 jobs:
+  build:
+    uses: ./.github/workflows/build-snap.yml
+    with:
+      plugin_name: ${{ inputs.plugin_name }}
+
   release:
     name: 🚢 Release to latest/edge
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - name: 🛠 Set up snapcraft
+        uses: canonical/craft-actions/snapcraft/setup@main
 
-      - id: pack
-        uses: canonical/craft-actions/snapcraft/pack@main
+      - name: ⬇️ Download packed snaps
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ inputs.plugin_name }}-snap
 
       - name: 🚢 Upload and release to latest/edge
         id: release
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_EDGE }}
-          snap_files: ${{ steps.pack.outputs.snaps }}
         run: |
           set -euo pipefail
 
-          # The pack action installs snapcraft as a side effect; make sure it
-          # is available anyway in case that ever changes.
           command -v snapcraft >/dev/null || sudo snap install snapcraft --classic
 
           echo "| Architecture | Version | Revision |" >> summary.md
           echo "| ------------ | ------- | -------- |" >> summary.md
 
           revisions=""
-          for snap_file in $snap_files; do
+          for snap_file in ./*.snap; do
             out="$(snapcraft upload "$snap_file" --release=latest/edge)"
             revision="$(echo "$out" | grep -oP 'Revision \K[0-9]+')"
 
