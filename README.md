@@ -27,6 +27,10 @@ Inputs:
 | ------------- | -------- | ------------------------------------------------------- |
 | `plugin_name` | yes      | Upstream plugin project name, used in the artifact name |
 
+The packed snap is uploaded as an artifact named `<plugin_name>-snap`
+(this name is also relied upon by `release-to-edge.yml`) and kept for 7
+days.
+
 ### `release-to-edge.yml`
 
 Builds the snap by calling `build-snap.yml`, then releases the packed snap

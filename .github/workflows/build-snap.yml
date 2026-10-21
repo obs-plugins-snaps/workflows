@@ -20,7 +20,13 @@ jobs:
       - uses: canonical/craft-actions/snapcraft/pack@main
         id: pack
 
+      # The artifact name is part of the contract with release-to-edge.yml,
+      # which downloads it by name; keep the two in sync.
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.plugin_name }}-snap
           path: ${{ steps.pack.outputs.snaps }}
+          # CI artifacts rarely need to outlive a week; without this every
+          # run would keep them for the 90-day default.
+          retention-days: 7
+          if-no-files-found: error

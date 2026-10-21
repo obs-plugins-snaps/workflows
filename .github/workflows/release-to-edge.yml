@@ -34,6 +34,8 @@ jobs:
       - name: 🛠 Set up snapcraft
         uses: canonical/craft-actions/snapcraft/setup@main
 
+      # Downloads the artifact uploaded by the build job (via
+      # build-snap.yml); the artifact name is owned by build-snap.yml.
       - name: ⬇️ Download packed snaps
         uses: actions/download-artifact@v7
         with:
