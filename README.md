@@ -19,7 +19,7 @@ that artifacts from several plugin snaps can be told apart.
 
 Intended to run on pull requests and pushes to branches other than
 `main`; for releases from `main`, use `release-to-edge.yml` instead, which
-also packs the snap.
+reuses this workflow to pack the snap.
 
 Inputs:
 
@@ -29,10 +29,10 @@ Inputs:
 
 ### `release-to-edge.yml`
 
-Packs the snap in the calling repository and releases it to the
-`latest/edge` channel of the Snap Store. Intended to be called on every
-push to `main`, so that edge always tracks the current development state.
-Prints the uploaded revisions in the workflow summary.
+Builds the snap by calling `build-snap.yml`, then releases the packed snap
+to the `latest/edge` channel of the Snap Store. Intended to be called on
+every push to `main`, so that edge always tracks the current development
+state. Prints the uploaded revisions in the workflow summary.
 
 Inputs:
 
