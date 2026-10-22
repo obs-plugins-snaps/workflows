@@ -19,15 +19,15 @@ jobs:
       - uses: actions/checkout@v7
 
       # Default icon: the org avatar. Repos may override it by shipping
-      # their own snap/meta/gui/icon.png (checked out above, if present).
+      # their own snap/gui/icon.png (checked out above, if present).
       - name: 🖼️ Fetch default icon
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [[ ! -f snap/meta/gui/icon.png ]]; then
+          if [[ ! -f snap/gui/icon.png ]]; then
             mkdir -p snap/meta/gui
             org_id="$(curl -fsSL https://api.github.com/orgs/obs-plugins-snaps | jq -r .id)"
-            curl -fsSL -o snap/meta/gui/icon.png \
+            curl -fsSL -o snap/gui/icon.png \
               "https://avatars.githubusercontent.com/u/${org_id}?size=256"
           fi
 
