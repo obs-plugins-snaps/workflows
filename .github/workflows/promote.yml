@@ -60,7 +60,7 @@ jobs:
 
           # Accept "latest" as a shortcut for the newest revision in edge.
           if [[ "$requested_revision" == "latest" ]]; then
-            requested_revision="$(snapcraft list-revisions "$snap_name" \
+            requested_revision="$(snapcraft revisions "$snap_name" \
               | awk '/latest\/edge/ {gsub(/[^0-9]/, "", $1); if ($1 != "") revision = $1} END {print revision}')"
             if [[ -z "$requested_revision" ]]; then
               echo "::error::Could not find any revision in the latest/edge channel."
