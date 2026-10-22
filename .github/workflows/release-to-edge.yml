@@ -30,6 +30,7 @@ jobs:
     name: 🚢 Release to latest/edge
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: 🛠 Set up snapcraft
         uses: canonical/craft-actions/snapcraft/setup@main
