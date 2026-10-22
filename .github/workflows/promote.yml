@@ -41,7 +41,7 @@ jobs:
 
       - name: ⬆️ Promote
         env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_EDGE }}
           snap_name: ${{ inputs.plugin_name }}-obs-studio
           requested_channel: ${{ inputs.channel }}
           requested_revision: ${{ inputs.revision }}
