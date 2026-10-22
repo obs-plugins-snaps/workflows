@@ -67,10 +67,15 @@ jobs:
 
           echo "revisions=$revisions" >> "$GITHUB_OUTPUT"
 
+          # Hardcoded workflow name: this is a reusable workflow, so
+          # ${{ github.workflow }} would resolve to the *caller's* name (the
+          # release workflow, which is not dispatchable) instead of the
+          # promote workflow users need to run. The template fixes the caller
+          # file's name to "Promote snap".
           cat >> summary.md <<EOF
 
           To promote this release to beta, candidate, or stable, run the
-          "${{ github.workflow }}" workflow from the Actions tab of this
+          "Promote snap" workflow from the Actions tab of this
           repository: set \`channel\` to the target risk level, and leave
           \`revision\` as \`latest\` to promote the newest revision in
           \`latest/edge\` (this release), or set it to a specific revision
