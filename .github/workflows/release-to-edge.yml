@@ -83,3 +83,20 @@ jobs:
           EOF
 
           cat summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 🖼 Publish listing metadata (icon, summary, description)
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_EDGE }}
+        run: |
+          set -euo pipefail
+
+          # snapcraft upload does not push listing metadata: the store
+          # extracts text fields from the snap blob server-side, but the
+          # icon (meta/gui/icon.png) is only ever registered by the
+          # explicit upload-metadata command. Push it here so the public
+          # listing always mirrors the repository. --force overwrites any
+          # manual dashboard edits, which is intended: the repository is
+          # the source of truth for the listing.
+          for snap_file in ./*.snap; do
+            snapcraft upload-metadata "$snap_file" --force
+          done
