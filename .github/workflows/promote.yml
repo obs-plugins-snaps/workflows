@@ -29,6 +29,7 @@ jobs:
   promote:
     name: ⬆️ Promote revisions to a risk level
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # This workflow is meant to be triggered manually: the caller declares a
     # workflow_dispatch trigger with matching inputs and forwards them here.
     # GitHub requires write access to dispatch a workflow, so no extra
