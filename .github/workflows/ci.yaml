@@ -1,3 +1,7 @@
+# CI for the e2e tooling: lint, tests and type checks are orchestrated
+# by tox (see tox.toml) so the command logic lives next to the code;
+# actionlint validates the workflow files themselves.
+
 name: CI
 
 on:
@@ -14,20 +18,8 @@ jobs:
 
       - uses: astral-sh/setup-uv@v7
 
-      # PyGObject and pycairo ship no Linux wheels; building them from
-      # source needs the GObject introspection and cairo headers.
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libcairo2-dev \
-            libgirepository1.0-dev \
-            pkg-config
-
       - name: Run lint
-        run: |
-          uv run ruff check .
-          uv run ruff format --check .
+        run: uv run tox run -e lint
 
       - name: Run actionlint
         run: |
@@ -35,7 +27,7 @@ jobs:
           ./actionlint -color
 
       - name: Run tests
-        run: uv run pytest -v
+        run: uv run tox run -e 3.12
 
       - name: Run type checks
-        run: uv run ty check
+        run: uv run tox run -e ty

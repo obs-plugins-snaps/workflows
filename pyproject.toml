@@ -24,6 +24,7 @@ dev = [
     "pytest>=8",
     "ruff>=0.13",
     "ty>=0.0.100",
+    "tox-uv>=1",
 ]
 
 [tool.uv.workspace]
