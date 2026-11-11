@@ -1,0 +1,48 @@
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[project]
+name = "e2e-obs-plugins-snaps"
+version = "0.1.0"
+description = "Wayland-native end-to-end GUI harness for OBS plugin snaps"
+readme = "README.md"
+authors = [
+    { name = "Juan Luis Cano Rodríguez", email = "juan.rodriguez@canonical.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "atspi",
+    "sway-windows",
+]
+
+[project.scripts]
+e2e-obs = "e2e_obs:main"
+
+[tool.uv.workspace]
+members = [
+    "packages/atspi",
+    "packages/sway-windows",
+]
+
+[tool.uv.sources]
+atspi = { workspace = true }
+sway-windows = { workspace = true }
+
+[tool.uv.build-backend]
+module-name = "e2e_obs"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.13",
+    "ty>=0.0.100",
+]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+testpaths = [
+    "tests",
+    "packages/atspi/tests",
+    "packages/sway-windows/tests",
+]
