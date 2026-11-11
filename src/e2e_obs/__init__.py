@@ -23,7 +23,3 @@ screenshots in ``shots/``, logs in ``logs/``. Environment overrides:
 
 Exit codes: 0 on success, 1 on failure, 2 on usage error.
 """
-
-from e2e_obs.cli import build_parser, main
-
-__all__ = ["build_parser", "main"]

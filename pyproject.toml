@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-e2e-obs = "e2e_obs:main"
+e2e-obs = "e2e_obs.cli:main"
 
 [tool.uv.workspace]
 members = [

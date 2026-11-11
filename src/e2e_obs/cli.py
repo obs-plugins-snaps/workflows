@@ -9,7 +9,8 @@ from e2e_obs import driver
 
 # Pass-through commands whose trailing arguments are forwarded verbatim to
 # the app or to a library CLI. Argparse's REMAINDER cannot capture leading
-# option-like tokens (e.g. "e2e-obs windows --format json", bpo-17050), so
+# option-like tokens (e.g. "e2e-obs windows --format json"); gh-61252
+# (bpo-17050) is still open and this reproduces on 3.12, 3.13 and 3.14, so
 # these are tokenized manually in main() before argparse sees them; they are
 # declared in build_parser() for the help surface only.
 PASSTHROUGH = ("start", "windows", "atspi")

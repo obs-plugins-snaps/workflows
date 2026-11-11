@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any
+import typing as t
 
 from atspi.tree import (
     any_name_matches,
@@ -21,7 +21,7 @@ def error(message: str) -> None:
     print(f"error: {message}", file=sys.stderr)
 
 
-def emit(args: argparse.Namespace, lines: list[str], doc: Any) -> None:
+def emit(args: argparse.Namespace, lines: list[str], doc: t.Any) -> None:
     """Print a result in the requested output format."""
     if args.format == "json":
         print(json.dumps(doc, ensure_ascii=False))
@@ -134,7 +134,12 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
         ok = node.do_action(0)
-        action = node.get_action_name(0)
+        # get_action_name is deprecated upstream but there is no replacement
+        # for reading an action's name; silence just that one message.
+        with bridge.silence_deprecation(
+            r"Atspi\.Action\.get_action_name is deprecated"
+        ):
+            action = node.get_action_name(0)
         emit(
             args,
             [f"clicked [{action}] {node.get_role_name()}: {node.get_name()}"],

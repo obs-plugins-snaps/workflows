@@ -29,7 +29,6 @@ user bus) on which the target application is running with its accessibility
 bridge enabled.
 """
 
-from atspi.cli import build_parser, main
 from atspi.tree import (
     MAX_DEPTH,
     POLL_INTERVAL,
@@ -44,9 +43,7 @@ __all__ = [
     "MAX_DEPTH",
     "POLL_INTERVAL",
     "any_name_matches",
-    "build_parser",
     "find_first",
-    "main",
     "matching_names",
     "timeout_suffix",
     "walk",

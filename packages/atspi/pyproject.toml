@@ -16,4 +16,4 @@ dependencies = [
 ]
 
 [project.scripts]
-atspi = "atspi:main"
+atspi = "atspi.cli:main"

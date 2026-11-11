@@ -71,7 +71,7 @@ def test_click(fake_bridge, capsys):
     assert main(["click", "obs", "menu item", "About"]) == 0
     out = capsys.readouterr().out
     assert out == "clicked [click] menu item: About\n"
-    assert fake_bridge._about.actions_done == [0]
+    assert fake_bridge.about.actions_done == [0]
 
 
 def test_click_json(fake_bridge, capsys):
@@ -86,7 +86,7 @@ def test_click_json(fake_bridge, capsys):
 
 
 def test_click_no_actions(fake_bridge, capsys):
-    fake_bridge._app._n_actions = 0
+    fake_bridge.app.n_actions = 0
     assert main(["click", "obs", "application", "obs"]) == 1
     assert capsys.readouterr().err == (
         'error: cannot click application "obs": no actions available\n'

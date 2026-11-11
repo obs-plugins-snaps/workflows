@@ -20,7 +20,6 @@ Example::
     sway-windows --format json OBS
 """
 
-from sway_windows.cli import build_parser, main
 from sway_windows.tree import (
     find_window,
     get_tree,
@@ -30,11 +29,9 @@ from sway_windows.tree import (
 )
 
 __all__ = [
-    "build_parser",
     "find_window",
     "get_tree",
     "list_windows",
-    "main",
     "named_windows",
     "window_doc",
 ]

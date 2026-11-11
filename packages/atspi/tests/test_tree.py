@@ -7,6 +7,7 @@ from atspi.tree import (
     find_first,
     matching_names,
     timeout_suffix,
+    walk,
 )
 
 
@@ -40,6 +41,13 @@ def test_any_name_matches(app):
 
 def test_any_name_matches_none(app):
     assert any_name_matches(app, "no-such-thing") is None
+
+
+def test_walk_depth_first(app):
+    seen = [(node.get_name(), depth) for node, depth in walk(app)]
+    assert ("obs", 0) in seen
+    assert ("OBS 32.2.0 - Profile", 1) in seen
+    assert ("About", 4) in seen
 
 
 def test_timeout_suffix():

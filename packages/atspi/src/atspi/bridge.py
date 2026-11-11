@@ -8,6 +8,8 @@ the default user bus).
 
 from __future__ import annotations
 
+import contextlib
+import typing as t
 import warnings
 
 import gi
@@ -15,7 +17,17 @@ import gi
 gi.require_version("Atspi", "2.0")
 from gi.repository import Atspi  # ty: ignore[import-not-found]  (dynamic introspection module)
 
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+@contextlib.contextmanager
+def silence_deprecation(message: str) -> t.Generator[None]:
+    """Surgically ignore a single deprecation message from the Atspi API.
+
+    ``warnings.catch_warnings`` is process-global (not thread-safe), so keep
+    the guarded region as small as possible and never widen *message*.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning, message=message)
+        yield
 
 
 def get_app(name: str) -> Atspi.Accessible | None:

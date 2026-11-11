@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import re
 import time
+import typing as t
 from collections.abc import Generator
-from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from gi.repository import Atspi  # ty: ignore[import-not-found]  (dynamic introspection module)
 
 MAX_DEPTH = 30
@@ -22,7 +22,7 @@ POLL_INTERVAL = 0.2
 
 def walk(
     node: Atspi.Accessible, depth: int = 0
-) -> Generator[tuple[Any, int], None, None]:
+) -> Generator[tuple[t.Any, int], None, None]:
     """Yield every accessible node under *node*, depth-first."""
     yield node, depth
     if depth >= MAX_DEPTH:

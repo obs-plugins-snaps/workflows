@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import os
 import sys
+import typing as t
 from pathlib import Path
-from typing import NoReturn
 
 SWAY_UNIT = "obs-harness-sway"
 OBS_UNIT = "obs-harness-obs"
@@ -89,7 +89,7 @@ def error(message: str) -> None:
     print(f"error: {message}", file=sys.stderr)
 
 
-def die(message: str) -> NoReturn:
+def die(message: str) -> t.NoReturn:
     """Print *message* and exit with status 1."""
     error(message)
     raise SystemExit(1)
