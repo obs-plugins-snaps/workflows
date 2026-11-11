@@ -14,7 +14,8 @@ def test_parse_start():
     assert args.app_args == ["extra"]
 
 
-def test_main_start_passthrough(monkeypatch):
+def test_main_start_manual_argv(monkeypatch):
+    # option-like APPARGS cannot go through argparse (gh-61252)
     seen = {}
     monkeypatch.setattr(driver_mod, "start", lambda rest: seen.update(rest=rest) or 0)
     assert main(["start", "--startdb"]) == 0
@@ -34,29 +35,39 @@ def test_parse_wait_default():
 
 
 def test_parse_windows():
-    args = build_parser().parse_args(["windows", "OBS"])
+    args = build_parser().parse_args(["windows", "--format", "json", "OBS"])
     assert args.command == "windows"
-    assert args.args == ["OBS"]
+    assert args.pattern == "OBS"
+    assert args.format == "json"
 
 
-def test_main_windows_passthrough(monkeypatch):
-    seen = {}
-    monkeypatch.setattr(driver_mod, "windows", lambda rest: seen.update(rest=rest) or 0)
-    assert main(["windows", "--format", "json", "OBS"]) == 0
-    assert seen["rest"] == ["--format", "json", "OBS"]
-
-
-def test_main_atspi_passthrough(monkeypatch):
-    seen = {}
-    monkeypatch.setattr(driver_mod, "atspi", lambda rest: seen.update(rest=rest) or 0)
-    assert main(["atspi", "click", "menu item", "About"]) == 0
-    assert seen["rest"] == ["click", "menu item", "About"]
+def test_parse_windows_default():
+    args = build_parser().parse_args(["windows"])
+    assert args.pattern is None
+    assert args.format == "text"
 
 
 def test_parse_atspi():
     args = build_parser().parse_args(["atspi", "click", "menu item", "About"])
     assert args.command == "atspi"
-    assert args.args == ["click", "menu item", "About"]
+    assert args.atspi_command == "click"
+    assert args.role == "menu item"
+    assert args.pattern == "About"
+    assert args.wait == 0.0
+
+
+def test_parse_atspi_wait():
+    args = build_parser().parse_args(
+        ["atspi", "find", "frame", "OBS.*", "--wait", "10"]
+    )
+    assert args.atspi_command == "find"
+    assert args.wait == 10.0
+
+
+def test_parse_atspi_tree_depth():
+    args = build_parser().parse_args(["atspi", "tree", "2"])
+    assert args.atspi_command == "tree"
+    assert args.depth == 2
 
 
 def test_parse_save_default():

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from e2e_obs import driver, session
+from e2e_obs.cli import main
 
 TREE = {
     "type": "root",
@@ -76,18 +77,61 @@ def test_defaults(monkeypatch, home):
     assert driver.atspi_app() == "source-record"
 
 
-def test_atspi_injects_app(monkeypatch, home):
+def test_atspi_dispatch(home, monkeypatch):
+    import atspi.commands
+
+    seen = []
+    monkeypatch.setattr(
+        atspi.commands, "apps", lambda fmt: seen.append(("apps", fmt)) or 0
+    )
+    monkeypatch.setattr(
+        atspi.commands,
+        "click",
+        lambda app, role, pattern, wait, fmt: (
+            seen.append(("click", app, role, pattern, wait, fmt)) or 0
+        ),
+    )
+    monkeypatch.setattr(
+        atspi.commands,
+        "assert_cmd",
+        lambda app, pattern, wait, fmt: seen.append(("assert", app, pattern)) or 0,
+    )
+    assert main(["atspi", "apps", "--format", "json"]) == 0
+    assert main(["atspi", "click", "menu item", "About"]) == 0
+    assert main(["atspi", "assert", "OBS"]) == 0
+    assert seen == [
+        ("apps", "json"),
+        ("click", "obs", "menu item", "About", 0.0, "text"),
+        ("assert", "obs", "OBS"),
+    ]
+
+
+def test_atspi_app_from_env(home, monkeypatch):
+    import atspi.commands
+
+    seen = {}
+    monkeypatch.setenv("ATSPI_APP", "source-record")
+    monkeypatch.setattr(
+        atspi.commands,
+        "find",
+        lambda app, role, pattern, wait, fmt: seen.update(app=app) or 0,
+    )
+    assert main(["atspi", "find", "frame", "OBS"]) == 0
+    assert seen["app"] == "source-record"
+
+
+def test_windows_dispatch(home, monkeypatch, capsys):
     seen = {}
 
-    def fake_main(argv):
-        seen["argv"] = argv
+    def fake_windows(pattern=None, fmt="text"):
+        seen.update(pattern=pattern, fmt=fmt)
         return 0
 
-    monkeypatch.setattr(driver, "atspi_main", fake_main)
-    assert driver.atspi(["click", "menu item", "About"]) == 0
-    assert seen["argv"] == ["click", "obs", "menu item", "About"]
-    assert driver.atspi(["apps"]) == 0
-    assert seen["argv"] == ["apps"]
+    monkeypatch.setattr(driver, "windows", fake_windows)
+    assert main(["windows"]) == 0
+    assert seen == {"pattern": None, "fmt": "text"}
+    assert main(["windows", "--format", "json", "OBS"]) == 0
+    assert seen == {"pattern": "OBS", "fmt": "json"}
 
 
 def test_obslog_missing(capsys):

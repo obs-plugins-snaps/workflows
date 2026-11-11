@@ -17,6 +17,7 @@ real input devices (e.g. a desktop VM) raw input would work.
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import signal
@@ -24,9 +25,13 @@ import subprocess
 import time
 from pathlib import Path
 
-from atspi.cli import main as atspi_main
-from sway_windows import get_tree, named_windows
-from sway_windows.cli import main as sway_windows_main
+from atspi import commands as atspi_commands
+from sway_windows import (
+    find_window,
+    get_tree,
+    list_windows,
+    named_windows,
+)
 
 from e2e_obs.session import (
     OBS_UNIT,
@@ -338,11 +343,15 @@ def save(name: str | None = None) -> int:
     return 0
 
 
-def windows(args: list[str]) -> int:
-    """List windows or find one by title (delegates to sway-windows)."""
+def windows(pattern: str | None = None, fmt: str = "text") -> int:
+    """List windows, or print the first one whose title matches *pattern*."""
     require_session()
     apply_session_env()
-    return sway_windows_main(args)
+    windows_ = named_windows(get_tree())
+    if pattern is not None:
+        return find_window(windows_, pattern, fmt)
+    list_windows(windows_, fmt)
+    return 0
 
 
 def wait_cmd(pattern: str, timeout: float = 60.0) -> int:
@@ -360,12 +369,30 @@ def wait_cmd(pattern: str, timeout: float = 60.0) -> int:
         time.sleep(1.0)
 
 
-def atspi(args: list[str]) -> int:
-    """Forward to the atspi CLI, injecting the configured application name."""
+def atspi(args: argparse.Namespace) -> int:
+    """Drive the configured application over AT-SPI, in-process.
+
+    The application name comes from ``$ATSPI_APP``; the subcommand and its
+    arguments are already parsed by the CLI. Only the session environment
+    is applied here — the atspi command layer does the rest.
+    """
     apply_session_env()
-    if not args or args[0] == "apps":
-        return atspi_main(args)
-    return atspi_main([args[0], atspi_app(), *args[1:]])
+    app = atspi_app()
+    if args.atspi_command == "apps":
+        return atspi_commands.apps(args.format)
+    if args.atspi_command == "tree":
+        return atspi_commands.tree(app, args.depth, args.format)
+    if args.atspi_command == "find":
+        return atspi_commands.find(app, args.role, args.pattern, args.wait, args.format)
+    if args.atspi_command == "click":
+        return atspi_commands.click(
+            app, args.role, args.pattern, args.wait, args.format
+        )
+    if args.atspi_command == "text":
+        return atspi_commands.text(app, args.role, args.pattern, args.wait, args.format)
+    if args.atspi_command == "assert":
+        return atspi_commands.assert_cmd(app, args.pattern, args.wait, args.format)
+    return 2  # unreachable: argparse rejects unknown commands
 
 
 def obslog() -> int:

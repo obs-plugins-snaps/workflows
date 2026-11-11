@@ -3,31 +3,8 @@
 from __future__ import annotations
 
 import argparse
-import json
-import sys
-import typing as t
 
-from atspi.tree import (
-    any_name_matches,
-    find_first,
-    matching_names,
-    timeout_suffix,
-    walk,
-)
-
-
-def error(message: str) -> None:
-    """Print a lowercase, succinct error message in snap style."""
-    print(f"error: {message}", file=sys.stderr)
-
-
-def emit(args: argparse.Namespace, lines: list[str], doc: t.Any) -> None:
-    """Print a result in the requested output format."""
-    if args.format == "json":
-        print(json.dumps(doc, ensure_ascii=False))
-    else:
-        for line in lines:
-            print(line)
+from atspi import commands
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -73,98 +50,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Parse arguments and run the requested AT-SPI query or action."""
+    """Parse arguments and run the requested AT-SPI command."""
     args = build_parser().parse_args(argv)
-    # Imported lazily: pulls in GObject introspection and needs a session bus
-    # only when actually querying the registry.
-    from atspi import bridge
-
     if args.command == "apps":
-        names = bridge.list_app_names()
-        if names or args.format == "json":
-            emit(args, names, names)
-        else:
-            print("No applications on the accessibility bus.", file=sys.stderr)
-        return 0
-
-    app = bridge.get_app(args.app)
-    if app is None:
-        error(f'cannot find application "{args.app}" on the accessibility bus')
-        return 1
-
+        return commands.apps(args.format)
     if args.command == "tree":
-        lines = []
-        doc = []
-        for node, depth in walk(app):
-            if depth <= args.depth:
-                entry = {
-                    "depth": depth,
-                    "role": node.get_role_name(),
-                    "name": node.get_name() or "",
-                }
-                doc.append(entry)
-                lines.append("  " * depth + f"{entry['role']}: {entry['name'][:70]}")
-        emit(args, lines, doc)
-        return 0
-
+        return commands.tree(args.app, args.depth, args.format)
     if args.command == "find":
-        node = find_first(app, args.role, args.pattern, args.wait)
-        if node is None:
-            error(
-                f'no {args.role} matching "{args.pattern}"{timeout_suffix(args.wait)}'
-            )
-            return 1
-        emit(
-            args,
-            [f"{node.get_role_name()}: {node.get_name()}"],
-            {"role": node.get_role_name(), "name": node.get_name()},
-        )
-        return 0
-
+        return commands.find(args.app, args.role, args.pattern, args.wait, args.format)
     if args.command == "click":
-        node = find_first(app, args.role, args.pattern, args.wait)
-        if node is None:
-            error(
-                f'no {args.role} matching "{args.pattern}"{timeout_suffix(args.wait)}'
-            )
-            return 1
-        if node.get_n_actions() < 1:
-            error(
-                f'cannot click {node.get_role_name()} "{node.get_name()}": no actions available'
-            )
-            return 1
-        ok = node.do_action(0)
-        # get_action_name is deprecated upstream but there is no replacement
-        # for reading an action's name; silence just that one message.
-        with bridge.silence_deprecation(
-            r"Atspi\.Action\.get_action_name is deprecated"
-        ):
-            action = node.get_action_name(0)
-        emit(
-            args,
-            [f"clicked [{action}] {node.get_role_name()}: {node.get_name()}"],
-            {
-                "clicked": bool(ok),
-                "action": action,
-                "role": node.get_role_name(),
-                "name": node.get_name(),
-            },
-        )
-        return 0 if ok else 1
-
+        return commands.click(args.app, args.role, args.pattern, args.wait, args.format)
     if args.command == "text":
-        hits = matching_names(app, args.role, args.pattern, args.wait)
-        emit(args, hits, hits)
-        return 0
-
+        return commands.text(args.app, args.role, args.pattern, args.wait, args.format)
     if args.command == "assert":
-        matched = any_name_matches(app, args.pattern, args.wait)
-        if matched is None:
-            error(
-                f'no accessible name matching "{args.pattern}"{timeout_suffix(args.wait)}'
-            )
-            return 1
-        emit(args, [matched], {"matched": True, "name": matched})
-        return 0
-
+        return commands.assert_cmd(args.app, args.pattern, args.wait, args.format)
     return 2  # unreachable: argparse rejects unknown commands

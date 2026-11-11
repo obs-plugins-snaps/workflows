@@ -7,13 +7,13 @@ import sys
 
 from e2e_obs import driver
 
-# Pass-through commands whose trailing arguments are forwarded verbatim to
-# the app or to a library CLI. Argparse's REMAINDER cannot capture leading
-# option-like tokens (e.g. "e2e-obs windows --format json"); gh-61252
-# (bpo-17050) is still open and this reproduces on 3.12, 3.13 and 3.14, so
-# these are tokenized manually in main() before argparse sees them; they are
-# declared in build_parser() for the help surface only.
-PASSTHROUGH = ("start", "windows", "atspi")
+# "start" forwards its trailing arguments verbatim to `snap run
+# obs-studio`, and they may be option-like (e.g. "e2e-obs start
+# --startdb"). Argparse cannot capture leading option-like tokens into a
+# positional (gh-61252, bpo-17050; reproduced on 3.12-3.14), so "start" is
+# tokenized manually in main() before argparse sees it; it is declared in
+# build_parser() for the help surface only.
+MANUAL_ARGV = ("start",)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -35,24 +35,65 @@ def build_parser() -> argparse.ArgumentParser:
     p_save.add_argument(
         "name", nargs="?", help="screenshot name (default: shot-HHMMSS)"
     )
-    p_windows = sub.add_parser("windows", help="list windows (title, geometry)")
+    p_windows = sub.add_parser(
+        "windows", help="list windows (title, geometry) or find one by title"
+    )
     p_windows.add_argument(
-        "args",
-        nargs=argparse.REMAINDER,
-        metavar="ARGS",
-        help="arguments forwarded to sway-windows",
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="output format (default: text)",
+    )
+    p_windows.add_argument(
+        "pattern",
+        nargs="?",
+        metavar="REGEX",
+        help="print the first window whose title matches this regex; "
+        "without it, list all named windows",
     )
     p_wait = sub.add_parser("wait", help="poll the compositor for a window title")
     p_wait.add_argument("pattern", metavar="REGEX")
     p_wait.add_argument(
         "timeout", nargs="?", type=float, default=60.0, metavar="SECONDS"
     )
-    p_atspi = sub.add_parser("atspi", help="drive OBS over AT-SPI (accessibility)")
-    p_atspi.add_argument(
-        "args",
-        nargs=argparse.REMAINDER,
-        metavar="ARGS",
-        help="atspi subcommand and arguments; APP is injected",
+    p_atspi = sub.add_parser(
+        "atspi", help="drive the OBS application over AT-SPI (accessibility)"
+    )
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="output format (default: text)",
+    )
+    atspi_sub = p_atspi.add_subparsers(
+        dest="atspi_command", required=True, metavar="COMMAND"
+    )
+    atspi_sub.add_parser(
+        "apps", parents=[common], help="list accessibility applications"
+    )
+    p_tree = atspi_sub.add_parser(
+        "tree", parents=[common], help="dump the OBS accessibility tree"
+    )
+    p_tree.add_argument("depth", nargs="?", type=int, default=3)
+    wait_help = "poll until a match appears, up to SECONDS (default: single check)"
+    for name, help_text in (
+        ("find", "print the first matching node"),
+        ("click", "perform the first action on the first matching node"),
+        ("text", "print names of all matching nodes"),
+    ):
+        p = atspi_sub.add_parser(name, parents=[common], help=help_text)
+        p.add_argument("role")
+        p.add_argument("pattern", metavar="REGEX")
+        p.add_argument(
+            "--wait", type=float, default=0.0, metavar="SECONDS", help=wait_help
+        )
+    p_assert = atspi_sub.add_parser(
+        "assert", parents=[common], help="exit 0 if any accessible name matches"
+    )
+    p_assert.add_argument("pattern", metavar="REGEX")
+    p_assert.add_argument(
+        "--wait", type=float, default=0.0, metavar="SECONDS", help=wait_help
     )
     sub.add_parser("obslog", help="print the path of the newest OBS log file")
     return parser
@@ -61,13 +102,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and run the requested harness command."""
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0] in PASSTHROUGH:
-        cmd, rest = argv[0], argv[1:]
-        if cmd == "start":
-            return driver.start(rest)
-        if cmd == "windows":
-            return driver.windows(rest)
-        return driver.atspi(rest)
+    if argv and argv[0] in MANUAL_ARGV:
+        return driver.start(argv[1:])
     args = build_parser().parse_args(argv)
     if args.command == "start":
         return driver.start(args.app_args)
@@ -76,11 +112,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "save":
         return driver.save(args.name)
     if args.command == "windows":
-        return driver.windows(args.args)
+        return driver.windows(args.pattern, args.format)
     if args.command == "wait":
         return driver.wait_cmd(args.pattern, args.timeout)
     if args.command == "atspi":
-        return driver.atspi(args.args)
+        return driver.atspi(args)
     if args.command == "obslog":
         return driver.obslog()
     return 2  # unreachable: argparse rejects unknown commands
