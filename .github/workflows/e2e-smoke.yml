@@ -1,0 +1,109 @@
+name: E2E smoke test
+
+on:
+  workflow_call:
+    inputs:
+      plugin_name:
+        description: >-
+          Name of the upstream plugin project; the snap name is
+          `<plugin_name>-obs-studio`
+        required: true
+        type: string
+      pytest_args:
+        description: >-
+          Extra arguments passed to pytest. Defaults to running only the
+          smoke test tier; pass e.g. `-m "smoke or interaction"` for a
+          deeper run
+        required: false
+        type: string
+        default: -m smoke
+      timeout-minutes:
+        description: >-
+          Maximum runtime of the e2e job, in minutes. Defaults to 30;
+          raise it at the call site for slow plugins.
+        required: false
+        type: number
+
+jobs:
+  e2e:
+    name: E2E smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes || 30 }}
+    steps:
+      # The caller repository: carries tests/e2e (pytest) and the snap
+      # artifact built by build-snap.yml in the same run.
+      - uses: actions/checkout@v7
+
+      # The reusable workflow runs from its own checkout: that is where
+      # the Python workspace (e2e-obs and its packages) lives.
+      - name: Check out the workflows repository
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/workflows
+          path: workflows
+
+      - name: Download the built snap
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ inputs.plugin_name }}-snap
+          path: snap
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            at-spi2-core \
+            dbus-user-session \
+            gir1.2-atspi-2.0 \
+            grim \
+            python3-gi \
+            sway
+
+      # The snap-packaged uv cannot be used here: its AppArmor confinement
+      # makes AT-SPI observe the test subject instead of the OBS snap.
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install the Python workspace
+        run: cd workflows && uv sync --all-packages
+
+      - name: Install OBS Studio and the plugin snap
+        run: |
+          # The store OBS Studio the plugin was built against
+          # (build-snaps: obs-studio/latest/stable).
+          sudo snap install obs-studio
+          sudo snap install --dangerous \
+            "snap/${{ inputs.plugin_name }}-obs-studio_"*.snap
+          sudo snap connect "obs-studio:obs-plugins" \
+            "${{ inputs.plugin_name }}-obs-studio:obs-plugins"
+
+      # systemd-run --user needs a user manager for the runner account;
+      # informational only — the harness startup surfaces real problems.
+      - name: Bootstrap the user session
+        run: |
+          sudo loginctl enable-linger "$USER"
+          systemctl --user is-system-running || true
+
+      - name: Run the e2e tests
+        env:
+          E2E_OBS_HOME: ${{ github.workspace }}/e2e-home
+        run: |
+          cd workflows
+          uv run pytest "$GITHUB_WORKSPACE/tests/e2e" ${{ inputs.pytest_args }}
+
+      - name: Collect OBS logs
+        if: always()
+        run: |
+          mkdir -p e2e-home/obs-logs
+          cp -a "$HOME/snap/obs-studio/common/.config/obs-studio/logs" \
+            e2e-home/obs-logs/ 2>/dev/null || true
+
+      - name: Upload e2e artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.plugin_name }}-e2e
+          path: e2e-home/
+          if-no-files-found: ignore
