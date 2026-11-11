@@ -26,10 +26,7 @@ on:
         required: true
         type: string
       pytest_args:
-        description: >-
-          Extra arguments passed to pytest. The suite's own pytest.ini
-          already deselects the opt-in `interaction` tests; pass e.g.
-          `-m interaction` for a deeper run
+        description: Extra arguments passed to pytest
         required: false
         type: string
         default: ""

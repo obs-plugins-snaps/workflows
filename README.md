@@ -95,7 +95,7 @@ be triaged from the artifact alone.
 | Input             | Required | Description                                                                          |
 | ----------------- | -------- | ------------------------------------------------------------------------------------ |
 | `plugin_name`     | yes      | Upstream plugin project name; the snap name is `<plugin_name>-obs-studio`            |
-| `pytest_args`     | no       | Extra pytest arguments (the suite's `pytest.ini` already deselects the opt-in `interaction` tests) |
+| `pytest_args`     | no       | Extra pytest arguments passed through to the suite                                                 |
 | `tests_path`      | no       | Path of the pytest e2e suite, relative to the repository root (default `tests/e2e`)  |
 | `timeout-minutes` | no       | Job runtime cap in minutes (default 30); raise it at the call site for slow plugins  |
 
