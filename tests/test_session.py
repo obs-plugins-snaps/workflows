@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from e2e_obs import session
@@ -42,7 +44,6 @@ def test_apply_session_env(home, monkeypatch):
     monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
     (session.state_dir() / "wayland-display").write_text("wayland-3\n")
     session.apply_session_env()
-    import os
 
     assert os.environ["WAYLAND_DISPLAY"] == "wayland-3"
     assert os.environ["SWAYSOCK"] == str(home / ".state" / "sway.sock")

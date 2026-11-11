@@ -38,14 +38,17 @@ def emit(fmt: str, lines: list[str], doc: t.Any) -> None:
 
 
 def _get_app(name: str) -> t.Any:
-    from atspi import bridge  # lazy: pulls in GObject introspection
+    # Deliberately lazy: GObject introspection and the session bus are only
+    # needed once a command actually runs, not at import time.
+    from atspi import bridge  # noqa: PLC0415
 
     return bridge.get_app(name)
 
 
 def apps(fmt: str = "text") -> int:
     """List the applications on the accessibility bus."""
-    from atspi import bridge  # lazy: pulls in GObject introspection
+    # Deliberately lazy: see _get_app.
+    from atspi import bridge  # noqa: PLC0415
 
     names = bridge.list_app_names()
     if names or fmt == "json":
@@ -100,7 +103,8 @@ def click(
     app_name: str, role: str, pattern: str, wait: float = 0.0, fmt: str = "text"
 ) -> int:
     """Perform the first action on the first matching node."""
-    from atspi import bridge  # lazy: pulls in GObject introspection
+    # Deliberately lazy: see _get_app.
+    from atspi import bridge  # noqa: PLC0415
 
     app = _get_app(app_name)
     if app is None:
@@ -112,7 +116,8 @@ def click(
         return 1
     if node.get_n_actions() < 1:
         error(
-            f'cannot click {node.get_role_name()} "{node.get_name()}": no actions available'
+            f'cannot click {node.get_role_name()} "{node.get_name()}": '
+            "no actions available"
         )
         return 1
     ok = node.do_action(0)

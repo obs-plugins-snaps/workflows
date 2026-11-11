@@ -15,7 +15,7 @@ import warnings
 import gi
 
 gi.require_version("Atspi", "2.0")
-from gi.repository import Atspi  # ty: ignore[import-not-found]  (dynamic introspection module)
+from gi.repository import Atspi  # noqa: E402  (require_version must precede the import) # ty: ignore[import-not-found]
 
 
 @contextlib.contextmanager

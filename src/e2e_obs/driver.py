@@ -23,6 +23,7 @@ import re
 import signal
 import subprocess
 import time
+import typing as t
 from pathlib import Path
 
 from atspi import commands as atspi_commands
@@ -378,21 +379,23 @@ def atspi(args: argparse.Namespace) -> int:
     """
     apply_session_env()
     app = atspi_app()
-    if args.atspi_command == "apps":
-        return atspi_commands.apps(args.format)
-    if args.atspi_command == "tree":
-        return atspi_commands.tree(app, args.depth, args.format)
-    if args.atspi_command == "find":
-        return atspi_commands.find(app, args.role, args.pattern, args.wait, args.format)
-    if args.atspi_command == "click":
-        return atspi_commands.click(
+    handlers: dict[str, t.Callable[[], int]] = {
+        "apps": lambda: atspi_commands.apps(args.format),
+        "tree": lambda: atspi_commands.tree(app, args.depth, args.format),
+        "find": lambda: atspi_commands.find(
             app, args.role, args.pattern, args.wait, args.format
-        )
-    if args.atspi_command == "text":
-        return atspi_commands.text(app, args.role, args.pattern, args.wait, args.format)
-    if args.atspi_command == "assert":
-        return atspi_commands.assert_cmd(app, args.pattern, args.wait, args.format)
-    return 2  # unreachable: argparse rejects unknown commands
+        ),
+        "click": lambda: atspi_commands.click(
+            app, args.role, args.pattern, args.wait, args.format
+        ),
+        "text": lambda: atspi_commands.text(
+            app, args.role, args.pattern, args.wait, args.format
+        ),
+        "assert": lambda: atspi_commands.assert_cmd(
+            app, args.pattern, args.wait, args.format
+        ),
+    }
+    return handlers[args.atspi_command]()
 
 
 def obslog() -> int:

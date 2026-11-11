@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import typing as t
 
 from e2e_obs import driver
 
@@ -105,18 +106,12 @@ def main(argv: list[str] | None = None) -> int:
     if argv and argv[0] in MANUAL_ARGV:
         return driver.start(argv[1:])
     args = build_parser().parse_args(argv)
-    if args.command == "start":
-        return driver.start(args.app_args)
-    if args.command == "stop":
-        return driver.stop()
-    if args.command == "save":
-        return driver.save(args.name)
-    if args.command == "windows":
-        return driver.windows(args.pattern, args.format)
-    if args.command == "wait":
-        return driver.wait_cmd(args.pattern, args.timeout)
-    if args.command == "atspi":
-        return driver.atspi(args)
-    if args.command == "obslog":
-        return driver.obslog()
-    return 2  # unreachable: argparse rejects unknown commands
+    handlers: dict[str, t.Callable[[], int]] = {
+        "stop": driver.stop,
+        "save": lambda: driver.save(args.name),
+        "windows": lambda: driver.windows(args.pattern, args.format),
+        "wait": lambda: driver.wait_cmd(args.pattern, args.timeout),
+        "atspi": lambda: driver.atspi(args),
+        "obslog": driver.obslog,
+    }
+    return handlers[args.command]()

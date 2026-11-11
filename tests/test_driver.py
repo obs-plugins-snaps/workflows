@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atspi.commands
 import pytest
 
 from e2e_obs import driver, session
@@ -78,8 +79,6 @@ def test_defaults(monkeypatch, home):
 
 
 def test_atspi_dispatch(home, monkeypatch):
-    import atspi.commands
-
     seen = []
     monkeypatch.setattr(
         atspi.commands, "apps", lambda fmt: seen.append(("apps", fmt)) or 0
@@ -107,8 +106,6 @@ def test_atspi_dispatch(home, monkeypatch):
 
 
 def test_atspi_app_from_env(home, monkeypatch):
-    import atspi.commands
-
     seen = {}
     monkeypatch.setenv("ATSPI_APP", "source-record")
     monkeypatch.setattr(

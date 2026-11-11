@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import typing as t
 
 from atspi import commands
 
@@ -52,16 +53,20 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and run the requested AT-SPI command."""
     args = build_parser().parse_args(argv)
-    if args.command == "apps":
-        return commands.apps(args.format)
-    if args.command == "tree":
-        return commands.tree(args.app, args.depth, args.format)
-    if args.command == "find":
-        return commands.find(args.app, args.role, args.pattern, args.wait, args.format)
-    if args.command == "click":
-        return commands.click(args.app, args.role, args.pattern, args.wait, args.format)
-    if args.command == "text":
-        return commands.text(args.app, args.role, args.pattern, args.wait, args.format)
-    if args.command == "assert":
-        return commands.assert_cmd(args.app, args.pattern, args.wait, args.format)
-    return 2  # unreachable: argparse rejects unknown commands
+    handlers: dict[str, t.Callable[[], int]] = {
+        "apps": lambda: commands.apps(args.format),
+        "tree": lambda: commands.tree(args.app, args.depth, args.format),
+        "find": lambda: commands.find(
+            args.app, args.role, args.pattern, args.wait, args.format
+        ),
+        "click": lambda: commands.click(
+            args.app, args.role, args.pattern, args.wait, args.format
+        ),
+        "text": lambda: commands.text(
+            args.app, args.role, args.pattern, args.wait, args.format
+        ),
+        "assert": lambda: commands.assert_cmd(
+            args.app, args.pattern, args.wait, args.format
+        ),
+    }
+    return handlers[args.command]()
