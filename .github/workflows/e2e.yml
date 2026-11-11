@@ -1,4 +1,4 @@
-# E2E smoke tests for the plugin snap fleet.
+# End-to-end (e2e) tests for the plugin snap fleet.
 #
 # Scope notes:
 #
@@ -14,7 +14,7 @@
 #   provenance holds via needs:) and the snap name is derived as
 #   <plugin_name>-obs-studio.
 
-name: E2E smoke test
+name: E2E tests
 
 on:
   workflow_call:
@@ -27,12 +27,12 @@ on:
         type: string
       pytest_args:
         description: >-
-          Extra arguments passed to pytest. Defaults to running only the
-          smoke test tier; pass e.g. `-m "smoke or interaction"` for a
-          deeper run
+          Extra arguments passed to pytest. The suite's own pytest.ini
+          already deselects the opt-in `interaction` tests; pass e.g.
+          `-m interaction` for a deeper run
         required: false
         type: string
-        default: -m smoke
+        default: ""
       tests_path:
         description: >-
           Path (relative to the calling repository root) of the pytest
@@ -50,7 +50,7 @@ on:
 
 jobs:
   e2e:
-    name: E2E smoke test
+    name: E2E tests
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout-minutes || 30 }}
     steps:

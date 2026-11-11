@@ -72,9 +72,9 @@ Secrets:
 | ------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | `SNAPCRAFT_STORE_CREDENTIALS`   | Snap Store credentials with permission to release the snap to `beta`, `candidate`, and `stable`.          |
 
-### `e2e-smoke.yml`
+### `e2e.yml`
 
-Runs the end-to-end GUI smoke tests for the plugin snap, on the artifact
+Runs the end-to-end GUI tests for the plugin snap, on the artifact
 built by `build-snap.yml` in the same run (so e2e always validates the
 exact snap under review). Installs the store OBS Studio, sideloads the
 plugin snap, connects the `obs-plugins` content interface, and runs
@@ -95,7 +95,7 @@ be triaged from the artifact alone.
 | Input             | Required | Description                                                                          |
 | ----------------- | -------- | ------------------------------------------------------------------------------------ |
 | `plugin_name`     | yes      | Upstream plugin project name; the snap name is `<plugin_name>-obs-studio`            |
-| `pytest_args`     | no       | Extra pytest arguments (default `-m smoke`, the smoke test tier only)                |
+| `pytest_args`     | no       | Extra pytest arguments (the suite's `pytest.ini` already deselects the opt-in `interaction` tests) |
 | `tests_path`      | no       | Path of the pytest e2e suite, relative to the repository root (default `tests/e2e`)  |
 | `timeout-minutes` | no       | Job runtime cap in minutes (default 30); raise it at the call site for slow plugins  |
 
@@ -109,7 +109,7 @@ required check once it proves stable:
   e2e:
     if: github.event_name == 'pull_request'
     needs: build  # the e2e job tests the artifact built above
-    uses: obs-plugins-snaps/workflows/.github/workflows/e2e-smoke.yml@main
+    uses: obs-plugins-snaps/workflows/.github/workflows/e2e.yml@main
     with:
       plugin_name: "source-record"
 ```
@@ -142,7 +142,7 @@ State lives under `$E2E_OBS_HOME/.state` (default: the working directory);
 screenshots go to `shots/`, logs to `logs/`. Environment overrides:
 `OBS_TITLE_RE` (main window title regex, default `OBS`), `ATSPI_APP`
 (application name on the accessibility bus, default `obs`). Install with uv
-(`uv sync --all-packages`); the reusable `e2e-smoke` workflow consumes these
+(`uv sync --all-packages`); the reusable `e2e` workflow consumes these
 packages from its own checkout.
 
 ## Usage
@@ -200,7 +200,7 @@ workflows above reference store credentials directly, callers must pass
 
 ### Staging call sites (planned)
 
-The meta repository's staging flow will call `e2e-smoke.yml` for draft
+The meta repository's staging flow will call `e2e.yml` for draft
 plugin snaps, before graduation (and therefore before the store name is
 registered — the suite must never depend on store state, and it doesn't).
 The planned contract, requiring no fork of the harness:
@@ -211,7 +211,7 @@ The planned contract, requiring no fork of the harness:
 3. build and upload the artifact under the standard
    `<plugin_name>-snap` name (`download-artifact` is run-scoped, so
    `needs:` preserves the built-in-the-same-run provenance);
-4. call `e2e-smoke.yml` with `tests_path: staging/<name>/tests/e2e`.
+4. call `e2e.yml` with `tests_path: staging/<name>/tests/e2e`.
 
 Staging checks are blocking from the start (the soak exemption only
 applies to the plugin repositories' own CI).
