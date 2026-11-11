@@ -23,9 +23,10 @@ reuses this workflow to pack the snap.
 
 Inputs:
 
-| Input         | Required | Description                                             |
-| ------------- | -------- | ------------------------------------------------------- |
-| `plugin_name` | yes      | Upstream plugin project name, used in the artifact name |
+| Input             | Required | Description                                                          |
+| ----------------- | -------- | -------------------------------------------------------------------- |
+| `plugin_name`     | yes      | Upstream plugin project name, used in the artifact name              |
+| `timeout-minutes` | no       | Pack job runtime cap in minutes (default 60); raise it for slow builds |
 
 ### `release-to-edge.yml`
 
@@ -36,9 +37,10 @@ state. Prints the uploaded revisions in the workflow summary.
 
 Inputs:
 
-| Input         | Required | Description                                                                |
-| ------------- | -------- | -------------------------------------------------------------------------- |
-| `plugin_name` | yes      | Upstream plugin project name; the snap name is `<plugin_name>-obs-studio` |
+| Input             | Required | Description                                                                                   |
+| ----------------- | -------- | --------------------------------------------------------------------------------------------- |
+| `plugin_name`     | yes      | Upstream plugin project name; the snap name is `<plugin_name>-obs-studio`                     |
+| `timeout-minutes` | no       | Build and release job runtime cap in minutes (default 60); raise it for slow builds           |
 
 Secrets:
 

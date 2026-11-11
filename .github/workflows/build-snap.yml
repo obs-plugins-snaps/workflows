@@ -9,12 +9,19 @@ on:
           packaged plugin in logs and artifact names
         required: true
         type: string
+      timeout-minutes:
+        description: >-
+          Maximum runtime of the pack job, in minutes. Defaults to 60;
+          slow-building plugins may raise it at the call site (e.g. in
+          ci.yaml) via `timeout-minutes:` in the `with:` block.
+        required: false
+        type: number
 
 jobs:
   pack:
     name: Pack snap
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: ${{ inputs.timeout-minutes || 60 }}
     steps:
       - uses: actions/checkout@v7
 
