@@ -18,6 +18,17 @@ jobs:
 
       - uses: astral-sh/setup-uv@v7
 
+      # PyGObject and pycairo ship no Linux wheels; building them from
+      # source needs the cairo headers and the girepository-2.0
+      # development files (PyGObject >= 3.52 requires the new API).
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libcairo2-dev \
+            libgirepository-2.0-dev \
+            pkg-config
+
       - name: Run lint
         run: uv run tox run -e lint
 
