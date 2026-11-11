@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
-import sys
 
+import atspi
 import pytest
 
 
@@ -56,7 +56,7 @@ class FakeBridge:
     app: FakeNode | None = None
     about: FakeNode | None = None
 
-    def get_app(self, name: str) -> FakeNode | None:
+    def get_app(self, name: str, wait: float = 0.0) -> FakeNode | None:
         return self.app if self.app and name.lower() in ("obs", "o") else None
 
     def list_app_names(self) -> list[str]:
@@ -92,7 +92,10 @@ def fake_bridge(monkeypatch):
     """
     app, about = make_app()
     stub = FakeBridge(app=app, about=about)
-    monkeypatch.setitem(sys.modules, "atspi.bridge", stub)
+    # Patch the package attribute, not sys.modules: commands resolve the
+    # bridge with 'from atspi import bridge', which prefers the attribute
+    # once the real module has been imported anywhere in the session.
+    monkeypatch.setattr(atspi, "bridge", stub, raising=False)
     return stub
 
 
@@ -100,5 +103,5 @@ def fake_bridge(monkeypatch):
 def empty_bridge(monkeypatch):
     """Bridge stub reporting an empty accessibility bus."""
     stub = FakeBridge()
-    monkeypatch.setitem(sys.modules, "atspi.bridge", stub)
+    monkeypatch.setattr(atspi, "bridge", stub, raising=False)
     return stub

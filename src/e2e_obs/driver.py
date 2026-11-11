@@ -66,6 +66,36 @@ def atspi_app() -> str:
     return os.environ.get("ATSPI_APP") or DEFAULT_ATSPI_APP
 
 
+A11Y_WARMUP_TIMEOUT = 10.0
+A11Y_WARMUP_RETRY = 0.5
+
+
+def warmup_accessibility() -> None:
+    """Make the AT-SPI registry available before OBS starts.
+
+    Qt 6.4's accessibility bridge only activates when the registry is already
+    running at application startup (QT_LINUX_ACCESSIBILITY_ALWAYS_ON does not
+    change that), so OBS must never be the first accessibility client on the
+    bus: the very first query activates the a11y bus and its registry, and
+    this best-effort wait makes sure that happens before the OBS unit.
+    """
+    from atspi import bridge  # noqa: PLC0415
+    from gi.repository import GLib  # noqa: PLC0415 # ty: ignore[import-not-found]  (dynamic introspection module)
+
+    deadline = time.monotonic() + A11Y_WARMUP_TIMEOUT
+    while True:
+        try:
+            bridge.list_app_names()
+        except GLib.Error:
+            if time.monotonic() >= deadline:
+                error("accessibility registry did not come up; continuing")
+                return
+            time.sleep(A11Y_WARMUP_RETRY)
+            continue
+        print("accessibility registry: ready")
+        return
+
+
 def compositor_alive() -> bool:
     """Return True if the harness compositor answers on its IPC socket."""
     return (
@@ -196,6 +226,9 @@ def start(app_args: list[str]) -> int:
     # Polling and follow-up helpers must talk to the same compositor and bus
     # the session was started with.
     apply_session_env()
+    # Qt only wires OBS into the accessibility bus if the registry already
+    # exists at OBS startup; activate it first (see warmup_accessibility).
+    warmup_accessibility()
     env = session_env()
     subprocess.run(
         ["systemctl", "--user", "stop", OBS_UNIT],

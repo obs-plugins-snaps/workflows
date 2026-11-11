@@ -37,12 +37,12 @@ def emit(fmt: str, lines: list[str], doc: t.Any) -> None:
             print(line)
 
 
-def _get_app(name: str) -> t.Any:
+def _get_app(name: str, wait: float = 0.0) -> t.Any:
     # Deliberately lazy: GObject introspection and the session bus are only
     # needed once a command actually runs, not at import time.
     from atspi import bridge  # noqa: PLC0415
 
-    return bridge.get_app(name)
+    return bridge.get_app(name, wait)
 
 
 def apps(fmt: str = "text") -> int:
@@ -83,7 +83,7 @@ def find(
     app_name: str, role: str, pattern: str, wait: float = 0.0, fmt: str = "text"
 ) -> int:
     """Print the first node with *role* whose name matches *pattern*."""
-    app = _get_app(app_name)
+    app = _get_app(app_name, wait)
     if app is None:
         error(f'cannot find application "{app_name}" on the accessibility bus')
         return 1
@@ -106,7 +106,7 @@ def click(
     # Deliberately lazy: see _get_app.
     from atspi import bridge  # noqa: PLC0415
 
-    app = _get_app(app_name)
+    app = _get_app(app_name, wait)
     if app is None:
         error(f'cannot find application "{app_name}" on the accessibility bus')
         return 1
@@ -142,7 +142,7 @@ def text(
     app_name: str, role: str, pattern: str, wait: float = 0.0, fmt: str = "text"
 ) -> int:
     """Print the names of all nodes with *role* matching *pattern*."""
-    app = _get_app(app_name)
+    app = _get_app(app_name, wait)
     if app is None:
         error(f'cannot find application "{app_name}" on the accessibility bus')
         return 1
@@ -155,7 +155,7 @@ def assert_cmd(
     app_name: str, pattern: str, wait: float = 0.0, fmt: str = "text"
 ) -> int:
     """Exit 0 if any accessible name matches *pattern*."""
-    app = _get_app(app_name)
+    app = _get_app(app_name, wait)
     if app is None:
         error(f'cannot find application "{app_name}" on the accessibility bus')
         return 1
