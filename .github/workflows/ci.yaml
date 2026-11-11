@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test e2e tooling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Run lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Run actionlint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash -s --
+          ./actionlint -color
+
+      - name: Run tests
+        run: uv run pytest -v
+
+      - name: Run type checks
+        run: uv run ty check
