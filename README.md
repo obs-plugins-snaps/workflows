@@ -83,6 +83,11 @@ packages from this repository (see [e2e tooling](#e2e-tooling)). Tests
 run in a headless Wayland session (sway) — no display server setup is
 needed on the runner.
 
+Scope: **amd64 only** for now — the tested artifact comes from the
+calling repository's single-arch pack job. arm64 would additionally
+need free arm64 runners, store arm64 builds of `obs-studio`, and
+`snapcraft/pack` on arm64 runners; none verified yet.
+
 Screenshots, harness state, and OBS logs are collected under `e2e-home/`
 and uploaded as a `<plugin_name>-e2e` artifact, always, so failures can
 be triaged from the artifact alone.
@@ -91,6 +96,7 @@ be triaged from the artifact alone.
 | ----------------- | -------- | ------------------------------------------------------------------------------------ |
 | `plugin_name`     | yes      | Upstream plugin project name; the snap name is `<plugin_name>-obs-studio`            |
 | `pytest_args`     | no       | Extra pytest arguments (default `-m smoke`, the smoke test tier only)                |
+| `tests_path`      | no       | Path of the pytest e2e suite, relative to the repository root (default `tests/e2e`)  |
 | `timeout-minutes` | no       | Job runtime cap in minutes (default 30); raise it at the call site for slow plugins  |
 
 The calling repository must contain a `tests/e2e` pytest suite (as
@@ -191,4 +197,27 @@ Reusable workflows must be referenced with a full ref (`@main` above), and
 callers cannot add `runs-on` or `steps` to the calling job. Because the
 workflows above reference store credentials directly, callers must pass
 `secrets: inherit`.
+
+### Staging call sites (planned)
+
+The meta repository's staging flow will call `e2e-smoke.yml` for draft
+plugin snaps, before graduation (and therefore before the store name is
+registered — the suite must never depend on store state, and it doesn't).
+The planned contract, requiring no fork of the harness:
+
+1. render the copier template over `staging/<name>/` (so
+   `staging/<name>/tests/e2e` exists);
+2. overlay the draft `snapcraft.yaml`;
+3. build and upload the artifact under the standard
+   `<plugin_name>-snap` name (`download-artifact` is run-scoped, so
+   `needs:` preserves the built-in-the-same-run provenance);
+4. call `e2e-smoke.yml` with `tests_path: staging/<name>/tests/e2e`.
+
+Staging checks are blocking from the start (the soak exemption only
+applies to the plugin repositories' own CI).
+
+Note on build/test parity: the e2e environment installs
+`obs-studio/latest/stable` from the store, matching the template's
+`build-snaps:` entry. Plugins overriding `build-snaps:` silently
+diverge from the tested runtime.
 
