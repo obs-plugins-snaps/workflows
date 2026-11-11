@@ -38,6 +38,14 @@ on:
         required: false
         type: string
         default: tests/e2e
+      workflows_ref:
+        description: >-
+          Ref of the workflows repository to check out (where the harness
+          packages live). Defaults to its default branch; validation and
+          staging call sites may pin a branch or SHA
+        required: false
+        type: string
+        default: ""
       timeout-minutes:
         description: >-
           Maximum runtime of the e2e job, in minutes. Defaults to 30;
@@ -56,11 +64,13 @@ jobs:
       - uses: actions/checkout@v7
 
       # The reusable workflow runs from its own checkout: that is where
-      # the Python workspace (e2e-obs and its packages) lives.
+      # the Python workspace (e2e-obs and its packages) lives. An empty
+      # workflows_ref falls back to the repository's default branch.
       - name: Check out the workflows repository
         uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/workflows
+          ref: ${{ inputs.workflows_ref }}
           path: workflows
 
       - name: Download the built snap
