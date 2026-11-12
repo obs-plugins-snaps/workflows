@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
+import types
+
 import atspi
 import atspi.commands
 import pytest
@@ -281,3 +284,78 @@ def test_obslog_missing(capsys):
     rc = driver.obslog()
     if rc != 0:
         assert capsys.readouterr().err == "error: no OBS log file found\n"
+
+
+def test_start_compositor_fail_fast(home, tmp_path, monkeypatch, capsys):
+    """A compositor unit that dies during startup fails immediately.
+
+    The error carries the unit's journal, so the cause (e.g. a failed
+    socket bind) is visible without digging through artifacts.
+    """
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    journal = (
+        "Nov 12 01:22:00 systemd[1234]: Started obs-harness-sway.service...\n"
+        "Nov 12 01:22:00 sway[4242]: 00:00:00.002 [ERROR] [sway/ipc-server.c:107]"
+        " Unable to bind IPC socket"
+    )
+
+    def fake_run(cmd, **kwargs):
+        if cmd[0] == "swaymsg":
+            return types.SimpleNamespace(returncode=1)  # compositor not alive
+        if "is-active" in cmd:
+            return types.SimpleNamespace(returncode=3)  # unit inactive
+        if cmd[0] == "journalctl":
+            return types.SimpleNamespace(returncode=0, stdout=journal)
+        return types.SimpleNamespace(returncode=0)
+
+    fake = types.SimpleNamespace(
+        run=fake_run,
+        Popen=lambda *args, **kwargs: types.SimpleNamespace(pid=4242),
+        DEVNULL=subprocess.DEVNULL,
+        PIPE=subprocess.PIPE,
+        STDOUT=subprocess.STDOUT,
+    )
+    monkeypatch.setattr(driver, "subprocess", fake)
+    monkeypatch.setattr(driver.time, "sleep", lambda seconds: None)
+
+    with pytest.raises(SystemExit) as excinfo:
+        driver.start_compositor()
+    assert excinfo.value.code == 1
+    err = capsys.readouterr().err
+    assert err.startswith("error: the obs-harness-sway unit is not running:\n")
+    assert "Unable to bind IPC socket" in err
+
+
+def test_start_compositor_tolerates_slow_unit_start(home, tmp_path, monkeypatch):
+    """One inactive reading right after launch is not fatal (race).
+
+    systemd-run is asynchronous: the unit may not be active yet on the
+    first check, so only two consecutive inactive readings fail.
+    """
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    states = iter([3, 0])  # inactive once, then active
+
+    def fake_run(cmd, **kwargs):
+        if cmd[0] == "swaymsg":
+            return types.SimpleNamespace(returncode=1)  # compositor not alive
+        if "is-active" in cmd:
+            return types.SimpleNamespace(returncode=next(states))
+        return types.SimpleNamespace(returncode=0)
+
+    fake = types.SimpleNamespace(
+        run=fake_run,
+        Popen=lambda *args, **kwargs: types.SimpleNamespace(pid=4242),
+        DEVNULL=subprocess.DEVNULL,
+        PIPE=subprocess.PIPE,
+        STDOUT=subprocess.STDOUT,
+    )
+    monkeypatch.setattr(driver, "subprocess", fake)
+
+    # The fake sleep simulates the compositor coming up between rounds.
+    def fake_sleep(seconds):
+        (tmp_path / "wayland-1").touch()
+
+    monkeypatch.setattr(driver.time, "sleep", fake_sleep)
+
+    driver.start_compositor()
+    assert (session.state_dir() / "wayland-display").read_text() == "wayland-1"

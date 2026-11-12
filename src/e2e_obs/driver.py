@@ -130,6 +130,23 @@ def _terminate(pid: int) -> None:
         pass
 
 
+# systemd-run is asynchronous: the unit may not be active yet on the
+# first liveness check, so a single inactive reading is not fatal.
+UNIT_START_GRACE_ROUNDS = 2
+
+
+def unit_journal_tail(unit: str, lines: int = 10) -> str:
+    """The last journal entries of a user unit, for failure diagnostics."""
+    out = subprocess.run(
+        ["journalctl", "--user", f"--unit={unit}", "--no-pager", "-n", str(lines)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    entries = (out.stdout or "").strip()
+    return entries or "(no journal entries)"
+
+
 def start_compositor() -> None:
     """Start sway headless as a systemd user unit, or reuse a live one."""
     if compositor_alive():
@@ -190,11 +207,27 @@ def start_compositor() -> None:
         )
     # Discover the Wayland socket name (dynamic, usually wayland-N).
     deadline = time.monotonic() + COMPOSITOR_START_TIMEOUT
+    inactive_rounds = 0
     while time.monotonic() < deadline:
         for path in Path(xdg).glob("wayland-*"):
             if re.fullmatch(r"wayland-[0-9]+", path.name):
                 (state_dir() / "wayland-display").write_text(path.name)
                 return
+        # The compositor can die during startup (e.g. a fatal error
+        # binding its IPC socket). Don't wait out the full timeout
+        # polling a dead unit: fail fast with the unit's journal so the
+        # cause is visible in the caller's log.
+        unit_active = subprocess.run(
+            ["systemctl", "--user", "is-active", "--quiet", SWAY_UNIT],
+            check=False,
+            stdout=subprocess.DEVNULL,
+        )
+        inactive_rounds = inactive_rounds + 1 if unit_active.returncode != 0 else 0
+        if inactive_rounds >= UNIT_START_GRACE_ROUNDS:
+            die(
+                f"the {SWAY_UNIT} unit is not running:\n"
+                f"{unit_journal_tail(SWAY_UNIT)}"
+            )
         time.sleep(0.5)
     die("sway produced no Wayland socket")
 
