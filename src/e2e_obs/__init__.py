@@ -8,7 +8,9 @@ semantic (no screen coordinates), screenshots go through grim.
 
 CLI::
 
-    e2e-obs start [APPARGS...]   # sway + launch OBS + wait + save
+    e2e-obs start [--dismiss-wizard|--no-dismiss-wizard] [-- APPARGS...]
+                                 # sway + launch OBS + wait + save; the
+                                 # first-run wizard is dismissed by default
     e2e-obs save [NAME]          # screenshot -> shots/NAME.png
     e2e-obs windows [ARGS...]    # list windows (see sway-windows)
     e2e-obs wait REGEX [SECS]    # poll compositor for a window title

@@ -9,17 +9,40 @@ from e2e_obs.cli import build_parser, main
 
 
 def test_parse_start():
-    args = build_parser().parse_args(["start", "extra"])
+    args = build_parser().parse_args(["start", "--", "extra"])
     assert args.command == "start"
     assert args.app_args == ["extra"]
+    assert args.dismiss_wizard is True
 
 
-def test_main_start_manual_argv(monkeypatch):
-    # option-like APPARGS cannot go through argparse (gh-61252)
+def test_parse_start_no_dismiss_wizard(monkeypatch):
+    args = build_parser().parse_args(
+        ["start", "--no-dismiss-wizard", "--", "--startdb"]
+    )
+    assert args.dismiss_wizard is False
+    assert args.app_args == ["--startdb"]
+
+
+def test_main_start_forwards_app_args(monkeypatch):
     seen = {}
-    monkeypatch.setattr(driver_mod, "start", lambda rest: seen.update(rest=rest) or 0)
-    assert main(["start", "--startdb"]) == 0
-    assert seen["rest"] == ["--startdb"]
+    monkeypatch.setattr(
+        driver_mod,
+        "start",
+        lambda app_args, dismiss_wizard: seen.update(
+            app_args=app_args, dismiss_wizard=dismiss_wizard
+        )
+        or 0,
+    )
+    assert main(["start", "--no-dismiss-wizard", "--", "--startdb"]) == 0
+    assert seen == {"app_args": ["--startdb"], "dismiss_wizard": False}
+
+
+def test_start_app_args_require_separator(capsys):
+    # OBS flags are option-like: without -- they would be ambiguous with
+    # harness flags, so the separator is required (Canonical CLI standard).
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["start", "--startdb"])
+    assert "--startdb" in capsys.readouterr().err
 
 
 def test_parse_wait():

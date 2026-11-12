@@ -62,6 +62,110 @@ def test_wait_immediate_match(home, monkeypatch, capsys):
     assert capsys.readouterr().out == "0 0 1 1 OBS\n"
 
 
+class _Node:
+    """Duck-typed AT-SPI node: tree walking plus action support."""
+
+    def __init__(
+        self, name: str, role: str, children: list[_Node] | None = None,
+        n_actions: int = 1,
+    ) -> None:
+        self._name = name
+        self._role = role
+        self.children = children or []
+        self._n_actions = n_actions
+        self.actions_done: list[int] = []
+
+    def get_child_count(self) -> int:
+        return len(self.children)
+
+    def get_child_at_index(self, i: int) -> _Node | None:
+        return self.children[i] if i < len(self.children) else None
+
+    def get_name(self) -> str:
+        return self._name
+
+    def get_role_name(self) -> str:
+        return self._role
+
+    def get_n_actions(self) -> int:
+        return self._n_actions
+
+    def do_action(self, i: int) -> bool:
+        self.actions_done.append(i)
+        return True
+
+
+def _wizard_app(cancel: bool = True, closes: bool = True) -> _Node:
+    """A wizard dialog; its Cancel button closes it unless *closes* is off."""
+    dialog = _Node(
+        "Auto-Configuration Wizard",
+        "dialog",
+        children=[_Node("Cancel", "push button")] if cancel else [],
+    )
+    app = _Node("obs", "application", children=[dialog])
+    if cancel and closes:
+        button = dialog.children[0]
+        original_do_action = button.do_action
+
+        def dismiss(i: int) -> bool:
+            app.children.remove(dialog)
+            return bool(original_do_action(i))
+
+        button.do_action = dismiss  # type: ignore[method-assign]
+    return app
+
+
+def _bridge_stub(app: _Node | None):
+    class _Bridge:
+        @staticmethod
+        def get_app(name: str, wait: float = 0.0) -> _Node | None:
+            return app
+
+    return _Bridge
+
+
+def test_dismiss_wizard_clicks_cancel(home, monkeypatch):
+    monkeypatch.setattr(driver, "WIZARD_DISMISS_SETTLE", 0.1)
+    app = _wizard_app()
+    monkeypatch.setattr(atspi, "bridge", _bridge_stub(app), raising=False)
+    assert driver.dismiss_first_run_wizard() is True
+    dialog = app.children
+    assert dialog == []  # the fake click removed the dialog, as the real one
+
+
+def test_dismiss_wizard_false_when_dialog_sticks(home, monkeypatch):
+    monkeypatch.setattr(driver, "WIZARD_DISMISS_SETTLE", 0.1)
+    monkeypatch.setattr(
+        atspi,
+        "bridge",
+        _bridge_stub(_wizard_app(closes=False)),
+        raising=False,
+    )
+    assert driver.dismiss_first_run_wizard() is False
+
+
+def test_dismiss_wizard_none_when_no_dialog(home, monkeypatch):
+    monkeypatch.setattr(
+        atspi,
+        "bridge",
+        _bridge_stub(_Node("obs", "application")),
+        raising=False,
+    )
+    assert driver.dismiss_first_run_wizard() is None
+
+
+def test_dismiss_wizard_none_when_no_app(home, monkeypatch):
+    monkeypatch.setattr(atspi, "bridge", _bridge_stub(None), raising=False)
+    assert driver.dismiss_first_run_wizard() is None
+
+
+def test_dismiss_wizard_false_when_cancel_missing(home, monkeypatch):
+    monkeypatch.setattr(
+        atspi, "bridge", _bridge_stub(_wizard_app(cancel=False)), raising=False
+    )
+    assert driver.dismiss_first_run_wizard() is False
+
+
 def test_warmup_accessibility_ready(home, monkeypatch, capsys):
     calls = {"n": 0}
 

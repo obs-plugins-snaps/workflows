@@ -8,14 +8,6 @@ import typing as t
 
 from e2e_obs import driver
 
-# "start" forwards its trailing arguments verbatim to `snap run
-# obs-studio`, and they may be option-like (e.g. "e2e-obs start
-# --startdb"). Argparse cannot capture leading option-like tokens into a
-# positional (gh-61252, bpo-17050; reproduced on 3.12-3.14), so "start" is
-# tokenized manually in main() before argparse sees it; it is declared in
-# build_parser() for the help surface only.
-MANUAL_ARGV = ("start",)
-
 
 def build_parser() -> argparse.ArgumentParser:
     """Return the argument parser for the ``e2e-obs`` CLI."""
@@ -24,12 +16,26 @@ def build_parser() -> argparse.ArgumentParser:
         description="Wayland-native headless GUI harness for the obs-studio snap.",
     )
     sub = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
-    p_start = sub.add_parser("start", help="start a headless session and launch OBS")
+    p_start = sub.add_parser(
+        "start",
+        help="start a headless session, launch OBS and wait for its window",
+        description="Start a headless session, launch OBS and wait for its main "
+        "window. The first-run Auto-Configuration Wizard, when present, is "
+        "dismissed by default.",
+    )
+    p_start.add_argument(
+        "--dismiss-wizard",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="dismiss the first-run Auto-Configuration Wizard after launch, "
+        "if present (default: dismiss)",
+    )
     p_start.add_argument(
         "app_args",
-        nargs=argparse.REMAINDER,
+        nargs="*",
         metavar="APPARGS",
-        help="arguments passed to obs-studio",
+        help="arguments passed to obs-studio; use -- to separate them from "
+        "harness flags (e.g. 'start -- --startdb')",
     )
     sub.add_parser("stop", help="stop the session and clean up")
     p_save = sub.add_parser("save", help="screenshot the session")
@@ -103,10 +109,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and run the requested harness command."""
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0] in MANUAL_ARGV:
-        return driver.start(argv[1:])
     args = build_parser().parse_args(argv)
     handlers: dict[str, t.Callable[[], int]] = {
+        "start": lambda: driver.start(
+            args.app_args, dismiss_wizard=args.dismiss_wizard
+        ),
         "stop": driver.stop,
         "save": lambda: driver.save(args.name),
         "windows": lambda: driver.windows(args.pattern, args.format),

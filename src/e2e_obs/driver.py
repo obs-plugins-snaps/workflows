@@ -54,6 +54,10 @@ DEFAULT_ATSPI_APP = "obs"
 START_TIMEOUT = 90.0
 START_DRAW_SETTLE = 3.0
 COMPOSITOR_START_TIMEOUT = 10.0
+WIZARD_TITLE_RE = r"Auto-Configuration Wizard"
+WIZARD_BUTTON = "Cancel"
+WIZARD_WAIT = 3.0
+WIZARD_DISMISS_SETTLE = 2.0
 
 
 def title_re() -> str:
@@ -211,8 +215,13 @@ def find_window_rect(pattern: str) -> str | None:
     return None
 
 
-def start(app_args: list[str]) -> int:
-    """Start a headless session, launch OBS and wait for its main window."""
+def start(app_args: list[str], dismiss_wizard: bool = True) -> int:
+    """Start a headless session, launch OBS and wait for its main window.
+
+    When *dismiss_wizard* is set, the first-run Auto-Configuration Wizard —
+    shown on fresh OBS configurations — is dismissed via its Cancel button,
+    because it blocks input to the main window.
+    """
     pid_file = state_dir() / "obs.pid"
     if pid_file.exists():
         try:
@@ -288,8 +297,48 @@ def start(app_args: list[str]) -> int:
         time.sleep(1.0)
     time.sleep(START_DRAW_SETTLE)  # let it finish drawing
     save("00-initial")
+    if dismiss_wizard:
+        match dismiss_first_run_wizard():
+            case True:
+                print("first-run wizard: dismissed")
+            case False:
+                error("could not dismiss the first-run wizard; tests may be blocked")
     print(f"OBS window: {rect}")
     return 0
+
+
+def dismiss_first_run_wizard() -> bool | None:
+    """Close the first-run wizard via its Cancel button, if it is up.
+
+    Returns ``True`` when a wizard was found and dismissed, ``False`` when a
+    wizard was seen but could not be dismissed, and ``None`` when there is no
+    wizard (the common case on initialized configurations). Tolerant by
+    design: an OBS change to the dialog must degrade to a warning, not a
+    startup failure.
+    """
+    from atspi import bridge  # noqa: PLC0415
+    from atspi.tree import find_first  # noqa: PLC0415
+
+    app = bridge.get_app(atspi_app(), wait=WIZARD_WAIT)
+    if app is None:
+        return None
+    dialog = find_first(app, "dialog", WIZARD_TITLE_RE, wait=WIZARD_WAIT)
+    if dialog is None:
+        return None
+    cancel = find_first(
+        dialog, "push button", WIZARD_BUTTON, wait=WIZARD_WAIT
+    )
+    if cancel is None or cancel.get_n_actions() < 1:
+        return False
+    ok = bool(cancel.do_action(0))
+    # The press is asynchronous: the dialog keeps owning input until the
+    # event loop processes it, so wait for it to actually go away.
+    deadline = time.monotonic() + WIZARD_DISMISS_SETTLE
+    while time.monotonic() < deadline:
+        if find_first(app, "dialog", WIZARD_TITLE_RE) is None:
+            return ok
+        time.sleep(0.2)
+    return False
 
 
 def stop() -> int:
