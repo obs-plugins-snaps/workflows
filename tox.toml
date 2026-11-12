@@ -1,0 +1,34 @@
+# Task runners for the e2e tooling workspace; CI (ci.yaml) selects
+# environments from here so that the command logic lives in one place,
+# next to the code it checks.
+
+env_list = ["3.12", "lint", "ty"]
+
+[env_run_base]
+description = "run the test suite with pytest"
+runner = "uv-venv-lock-runner"
+dependency_groups = ["dev"]
+commands = [["pytest", { replace = "posargs", extend = true }]]
+
+[env.lint]
+description = "run linters"
+basepython = "3.12"
+skip_install = true
+commands = [
+    ["ruff", "check", { replace = "posargs", default = ["."], extend = true }],
+    ["ruff", "format", "--check", "--diff", { replace = "posargs", default = ["."], extend = true }],
+]
+
+[env.format]
+description = "run formatters"
+basepython = "3.12"
+skip_install = true
+commands = [
+    ["ruff", "format", { replace = "posargs", default = ["."], extend = true }],
+]
+
+[env.ty]
+description = "run type checks"
+basepython = "3.12"
+skip_install = true
+commands = [["ty", "check"]]

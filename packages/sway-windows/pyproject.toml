@@ -1,0 +1,17 @@
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[project]
+name = "sway-windows"
+version = "0.1.0"
+description = "List windows on a running sway compositor, or find one by title"
+readme = "README.md"
+authors = [
+    { name = "Juan Luis Cano Rodríguez", email = "juan.rodriguez@canonical.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+sway-windows = "sway_windows.cli:main"

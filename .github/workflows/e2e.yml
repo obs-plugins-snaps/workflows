@@ -1,0 +1,154 @@
+# End-to-end (e2e) tests for the plugin snap fleet.
+#
+# Scope notes:
+#
+# - amd64 only, for now: the tested artifact comes from the single-arch
+#   pack job of the calling repository. arm64 is a plausible follow-up
+#   (ubuntu-24.04-arm runners are free for public repos and the apt stack
+#   exists for arm64), but store arm64 support for obs-studio and
+#   snapcraft/pack on arm64 runners both still need a spike.
+#
+# - The contract with staging call sites (see the workflows README) is
+#   the inputs below: the artifact must be named <plugin_name>-snap
+#   (download-artifact is run-scoped, so "built in the same run"
+#   provenance holds via needs:) and the snap name is derived as
+#   <plugin_name>-obs-studio.
+
+name: E2E tests
+
+on:
+  workflow_call:
+    inputs:
+      plugin_name:
+        description: >-
+          Name of the upstream plugin project; the snap name is
+          `<plugin_name>-obs-studio`
+        required: true
+        type: string
+      pytest_args:
+        description: Extra arguments passed to pytest
+        required: false
+        type: string
+        default: ""
+      tests_path:
+        description: >-
+          Path (relative to the calling repository root) of the pytest
+          e2e suite. Defaults to the template-generated tests/e2e;
+          staging call sites pass staging/<name>/tests/e2e
+        required: false
+        type: string
+        default: tests/e2e
+      workflows_ref:
+        description: >-
+          Ref of the workflows repository to check out (where the harness
+          packages live). Defaults to its default branch; validation and
+          staging call sites may pin a branch or SHA
+        required: false
+        type: string
+        default: ""
+      timeout-minutes:
+        description: >-
+          Maximum runtime of the e2e job, in minutes. Defaults to 30;
+          raise it at the call site for slow plugins.
+        required: false
+        type: number
+
+jobs:
+  e2e:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes || 30 }}
+    steps:
+      # The caller repository: carries tests/e2e (pytest) and the snap
+      # artifact built by build-snap.yml in the same run.
+      - uses: actions/checkout@v7
+
+      # The reusable workflow runs from its own checkout: that is where
+      # the Python workspace (e2e-obs and its packages) lives. An empty
+      # workflows_ref falls back to the repository's default branch.
+      - name: Check out the workflows repository
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/workflows
+          ref: ${{ inputs.workflows_ref }}
+          path: workflows
+
+      - name: Download the built snap
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ inputs.plugin_name }}-snap
+          path: snap
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            at-spi2-core \
+            dbus-user-session \
+            gir1.2-atspi-2.0 \
+            grim \
+            python3-gi \
+            sway
+
+      # PyGObject and pycairo ship no Linux wheels; building them from
+      # source needs the cairo headers and the girepository-2.0
+      # development files (PyGObject >= 3.52 requires the new API).
+      - name: Install build headers
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            libcairo2-dev \
+            libgirepository-2.0-dev \
+            pkg-config
+
+      # The snap-packaged uv cannot be used here: its AppArmor confinement
+      # makes AT-SPI observe the test subject instead of the OBS snap.
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install the Python workspace
+        run: cd workflows && uv sync --all-packages
+
+      - name: Install OBS Studio and the plugin snap
+        run: |
+          # Build/test environment parity: the test environment installs
+          # the store OBS Studio the plugin was built against
+          # (obs-studio/latest/stable, the template's build-snaps entry).
+          # A plugin overriding build-snaps: in snapcraft.yaml would
+          # silently diverge from the tested runtime.
+          sudo snap install obs-studio
+          sudo snap install --dangerous \
+            "snap/${{ inputs.plugin_name }}-obs-studio_"*.snap
+          sudo snap connect "obs-studio:obs-plugins" \
+            "${{ inputs.plugin_name }}-obs-studio:obs-plugins"
+
+      # systemd-run --user needs a user manager for the runner account;
+      # informational only — the harness startup surfaces real problems.
+      - name: Bootstrap the user session
+        run: |
+          sudo loginctl enable-linger "$USER"
+          systemctl --user is-system-running || true
+
+      - name: Run the e2e tests
+        env:
+          E2E_OBS_HOME: ${{ github.workspace }}/e2e-home
+        run: |
+          cd workflows
+          uv run pytest -v "$GITHUB_WORKSPACE/${{ inputs.tests_path }}" \
+            ${{ inputs.pytest_args }}
+
+      - name: Collect OBS logs
+        if: always()
+        run: |
+          mkdir -p e2e-home/obs-logs
+          cp -a "$HOME/snap/obs-studio/common/.config/obs-studio/logs" \
+            e2e-home/obs-logs/ 2>/dev/null || true
+
+      - name: Upload e2e artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.plugin_name }}-e2e
+          path: e2e-home/
+          if-no-files-found: ignore

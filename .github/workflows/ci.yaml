@@ -1,0 +1,47 @@
+# CI for the e2e tooling: lint, tests and type checks are orchestrated
+# by tox (see tox.toml) so the command logic lives next to the code;
+# actionlint validates the workflow files themselves.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test e2e tooling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+
+      # PyGObject and pycairo ship no Linux wheels; building them from
+      # source needs the cairo headers and the girepository-2.0
+      # development files (PyGObject >= 3.52 requires the new API), and
+      # importing the atspi bridge needs the Atspi typelib (its tests
+      # exercise the real module, not only the fakes).
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gir1.2-atspi-2.0 \
+            libcairo2-dev \
+            libgirepository-2.0-dev \
+            pkg-config
+
+      - name: Run lint
+        run: uv run tox run -e lint
+
+      - name: Run actionlint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash -s --
+          ./actionlint -color
+
+      - name: Run tests
+        run: uv run tox run -e 3.12
+
+      - name: Run type checks
+        run: uv run tox run -e ty
