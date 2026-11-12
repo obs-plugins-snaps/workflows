@@ -224,10 +224,7 @@ def start_compositor() -> None:
         )
         inactive_rounds = inactive_rounds + 1 if unit_active.returncode != 0 else 0
         if inactive_rounds >= UNIT_START_GRACE_ROUNDS:
-            die(
-                f"the {SWAY_UNIT} unit is not running:\n"
-                f"{unit_journal_tail(SWAY_UNIT)}"
-            )
+            die(f"the {SWAY_UNIT} unit is not running:\n{unit_journal_tail(SWAY_UNIT)}")
         time.sleep(0.5)
     die("sway produced no Wayland socket")
 
