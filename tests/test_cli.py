@@ -28,10 +28,9 @@ def test_main_start_forwards_app_args(monkeypatch):
     monkeypatch.setattr(
         driver_mod,
         "start",
-        lambda app_args, dismiss_wizard: seen.update(
-            app_args=app_args, dismiss_wizard=dismiss_wizard
-        )
-        or 0,
+        lambda app_args, dismiss_wizard: (
+            seen.update(app_args=app_args, dismiss_wizard=dismiss_wizard) or 0
+        ),
     )
     assert main(["start", "--no-dismiss-wizard", "--", "--startdb"]) == 0
     assert seen == {"app_args": ["--startdb"], "dismiss_wizard": False}

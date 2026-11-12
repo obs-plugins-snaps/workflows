@@ -66,7 +66,10 @@ class _Node:
     """Duck-typed AT-SPI node: tree walking plus action support."""
 
     def __init__(
-        self, name: str, role: str, children: list[_Node] | None = None,
+        self,
+        name: str,
+        role: str,
+        children: list[_Node] | None = None,
         n_actions: int = 1,
     ) -> None:
         self._name = name

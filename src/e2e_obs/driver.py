@@ -325,9 +325,7 @@ def dismiss_first_run_wizard() -> bool | None:
     dialog = find_first(app, "dialog", WIZARD_TITLE_RE, wait=WIZARD_WAIT)
     if dialog is None:
         return None
-    cancel = find_first(
-        dialog, "push button", WIZARD_BUTTON, wait=WIZARD_WAIT
-    )
+    cancel = find_first(dialog, "push button", WIZARD_BUTTON, wait=WIZARD_WAIT)
     if cancel is None or cancel.get_n_actions() < 1:
         return False
     ok = bool(cancel.do_action(0))
