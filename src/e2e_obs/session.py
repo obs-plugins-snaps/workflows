@@ -51,7 +51,22 @@ def logs_dir() -> Path:
 
 def sway_sock() -> Path:
     """Path of the harness compositor's IPC socket."""
-    return state_dir() / "sway.sock"
+    return sockets_dir() / "sway.sock"
+
+
+def sockets_dir() -> Path:
+    """Directory for session sockets.
+
+    Unix sockets cannot bind to paths longer than 107 bytes, and
+    E2E_OBS_HOME can be arbitrarily deep (e.g. the GitHub runner
+    workspace is /home/runner/work/<repo>/<repo>, and a long snap name
+    pushes the sway socket past the limit — sway aborts on a failed
+    bind). Sockets live under the XDG runtime directory instead, which
+    is short and per-user.
+    """
+    d = Path(runtime_dir()) / "e2e-obs-harness"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 def runtime_dir() -> str:
