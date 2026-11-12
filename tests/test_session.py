@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -28,14 +29,27 @@ def test_dirs_created(home):
     assert (home / "logs").is_dir()
 
 
-def test_sway_sock_under_state(home):
-    assert session.sway_sock() == home / ".state" / "sway.sock"
+def test_sway_sock_under_runtime_dir():
+    # Sockets must stay short: Unix sockets cannot bind past 107 bytes,
+    # and E2E_OBS_HOME may be deep (GH runner workspaces). See
+    # sockets_dir().
+    expected = Path(session.runtime_dir()) / "e2e-obs-harness" / "sway.sock"
+    assert session.sway_sock() == expected
+
+
+def test_sway_sock_stays_short_with_deep_home(tmp_path, monkeypatch):
+    deep = Path(
+        "/home/runner/work/a-very-long-snap-name/a-very-long-snap-name/e2e-home"
+    )
+    monkeypatch.setenv("E2E_OBS_HOME", str(deep))
+    assert len(str(session.sway_sock())) <= 107
 
 
 def test_session_env(home):
     (session.state_dir() / "wayland-display").write_text("wayland-3\n")
     env = session.session_env()
-    assert env["SWAYSOCK"] == str(home / ".state" / "sway.sock")
+    expected = str(Path(session.runtime_dir()) / "e2e-obs-harness" / "sway.sock")
+    assert env["SWAYSOCK"] == expected
     assert env["WAYLAND_DISPLAY"] == "wayland-3"
     assert env["DBUS_SESSION_BUS_ADDRESS"].startswith("unix:path=/run/user/")
 
@@ -45,8 +59,9 @@ def test_apply_session_env(home, monkeypatch):
     (session.state_dir() / "wayland-display").write_text("wayland-3\n")
     session.apply_session_env()
 
+    expected = str(Path(session.runtime_dir()) / "e2e-obs-harness" / "sway.sock")
     assert os.environ["WAYLAND_DISPLAY"] == "wayland-3"
-    assert os.environ["SWAYSOCK"] == str(home / ".state" / "sway.sock")
+    assert os.environ["SWAYSOCK"] == expected
     assert os.environ["XDG_RUNTIME_DIR"] == f"/run/user/{os.getuid()}"
 
 
